@@ -160,6 +160,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
     // 初始化设备层
     int ret = usb_device_init();
     if (ret != USB_SUCCESS) {
+        debug_printf("初始化USB设备层失败, 错误码: %d", ret);
         return ret;
     }
     
@@ -167,6 +168,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
     if (target_serial) {
         int idx = find_device_by_serial(target_serial);
         if (idx >= 0) {
+            debug_printf("设备已打开, 序列号: %s, 槽位: %d", target_serial, idx);
             return idx;
         }
     }
@@ -174,6 +176,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
     // 查找空闲设备槽
     int slot = find_free_device_slot();
     if (slot < 0) {
+        debug_printf("没有可用的设备槽");
         return USB_ERROR_OTHER;
     }
     
@@ -185,6 +188,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
     // 获取设备列表
     int cnt = usb_device_get_device_list(g_libusb_context, &device_list);
     if (cnt < 0) {
+        debug_printf("获取设备列表失败, 错误码: %d", cnt);
         return USB_ERROR_OTHER;
     }
     
@@ -242,6 +246,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
         if (device_list) {
             usb_device_free_device_list(device_list, 1);
         }
+        debug_printf("未找到匹配的设备");
         return USB_ERROR_NOT_FOUND;
     }
     
@@ -251,8 +256,33 @@ USB_API int USB_OpenDevice(const char* target_serial) {
     // 申请接口
     if (usb_device_claim_interface(handle, 0) != 0) {
         usb_device_close(handle);
+        debug_printf("申请接口失败");
         return USB_ERROR_ACCESS;
     }
+    
+    // 初始化环形缓冲区
+    open_devices[slot].ring_buffer.buffer = (unsigned char*)malloc(RING_BUFFER_SIZE);
+    if (!open_devices[slot].ring_buffer.buffer) {
+        usb_device_release_interface(handle, 0);
+        usb_device_close(handle);
+        debug_printf("内存分配失败");
+        return USB_ERROR_OTHER;
+    }
+    
+    // 初始化临界区
+    if (!InitializeCriticalSectionAndSpinCount(&open_devices[slot].ring_buffer.cs, 0x1000)) {
+        free(open_devices[slot].ring_buffer.buffer);
+        usb_device_release_interface(handle, 0);
+        usb_device_close(handle);
+        debug_printf("初始化临界区失败");
+        return USB_ERROR_OTHER;
+    }
+    
+    // 初始化环形缓冲区参数
+    open_devices[slot].ring_buffer.size = RING_BUFFER_SIZE;
+    open_devices[slot].ring_buffer.write_pos = 0;
+    open_devices[slot].ring_buffer.read_pos = 0;
+    open_devices[slot].ring_buffer.data_size = 0;
     
     // 保存设备信息
     open_devices[slot].handle = handle;
@@ -268,25 +298,24 @@ USB_API int USB_OpenDevice(const char* target_serial) {
         snprintf(open_devices[slot].serial, sizeof(open_devices[slot].serial) - 1, "%04X:%04X", VENDOR_ID, PRODUCT_ID);
     }
     
-    // 初始化环形缓冲区
-    open_devices[slot].ring_buffer.buffer = (unsigned char*)malloc(RING_BUFFER_SIZE);
-    open_devices[slot].ring_buffer.size = RING_BUFFER_SIZE;
-    open_devices[slot].ring_buffer.write_pos = 0;
-    open_devices[slot].ring_buffer.read_pos = 0;
-    open_devices[slot].ring_buffer.data_size = 0;
-    InitializeCriticalSection(&open_devices[slot].ring_buffer.cs);
+    debug_printf("成功打开设备, 序列号: %s", open_devices[slot].serial);
     
     // 启动读取线程
+    open_devices[slot].thread_running = TRUE;
+    open_devices[slot].stop_thread = FALSE;
     open_devices[slot].read_thread = CreateThread(NULL, 0, read_thread_func, &open_devices[slot], 0, NULL);
     if (!open_devices[slot].read_thread) {
+        DeleteCriticalSection(&open_devices[slot].ring_buffer.cs);
         free(open_devices[slot].ring_buffer.buffer);
-        open_devices[slot].ring_buffer.buffer = NULL;
+        usb_device_release_interface(handle, 0);
+        usb_device_close(handle);
+        open_devices[slot].is_open = 0;
+        open_devices[slot].handle = NULL;
+        debug_printf("创建读取线程失败");
         return USB_ERROR_OTHER;
     }
     
-    open_devices[slot].thread_running = TRUE;
-    open_devices[slot].stop_thread = FALSE;
-    
+    debug_printf("成功启动读取线程");
     return slot;
 }
 
@@ -301,6 +330,28 @@ USB_API int USB_CloseDevice(const char* target_serial) {
         return USB_ERROR_NOT_FOUND;
     }
     
+    // 停止读取线程
+    if (open_devices[idx].read_thread) {
+        open_devices[idx].stop_thread = TRUE;
+        // 使用超时等待，避免永久阻塞
+        if (WaitForSingleObject(open_devices[idx].read_thread, 3000) == WAIT_TIMEOUT) {
+            // 如果3秒后线程仍未退出，则强制终止
+            TerminateThread(open_devices[idx].read_thread, 0);
+        }
+        CloseHandle(open_devices[idx].read_thread);
+        open_devices[idx].read_thread = NULL;
+    }
+    
+    // 释放环形缓冲区
+    EnterCriticalSection(&open_devices[idx].ring_buffer.cs);
+    if (open_devices[idx].ring_buffer.buffer) {
+        free(open_devices[idx].ring_buffer.buffer);
+        open_devices[idx].ring_buffer.buffer = NULL;
+    }
+    LeaveCriticalSection(&open_devices[idx].ring_buffer.cs);
+    DeleteCriticalSection(&open_devices[idx].ring_buffer.cs);
+    
+    // 关闭设备句柄
     if (open_devices[idx].handle) {
         usb_device_release_interface(open_devices[idx].handle, 0);
         usb_device_close(open_devices[idx].handle);
@@ -309,34 +360,31 @@ USB_API int USB_CloseDevice(const char* target_serial) {
         open_devices[idx].serial[0] = '\0';
     }
     
-    // 停止读取线程
-    open_devices[idx].stop_thread = TRUE;
-    WaitForSingleObject(open_devices[idx].read_thread, INFINITE);
-    CloseHandle(open_devices[idx].read_thread);
-    open_devices[idx].read_thread = NULL;
-    
-    // 释放环形缓冲区
-    if (open_devices[idx].ring_buffer.buffer) {
-        free(open_devices[idx].ring_buffer.buffer);
-        open_devices[idx].ring_buffer.buffer = NULL;
-    }
-    
     return USB_SUCCESS;
 }
 
 // 从USB设备读取数据实现
 USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int length) {
     if (!target_serial || !data || length <= 0) {
+        debug_printf("无效的参数: target_serial=%p, data=%p, length=%d", target_serial, data, length);
         return USB_ERROR_INVALID_PARAM;
     }
     
     int idx = find_device_by_serial(target_serial);
     if (idx < 0) {
+        debug_printf("未找到设备: %s", target_serial);
         return USB_ERROR_NOT_FOUND;
     }
     
     if (!open_devices[idx].is_open || !open_devices[idx].handle) {
+        debug_printf("设备未打开或句柄无效: %s", target_serial);
         return USB_ERROR_NOT_FOUND;
+    }
+    
+    // 检查线程状态
+    if (!open_devices[idx].thread_running || !open_devices[idx].read_thread) {
+        debug_printf("读取线程未运行: %s", target_serial);
+        return USB_ERROR_IO;
     }
     
     // 从环形缓冲区读取最新的数据
@@ -344,6 +392,8 @@ USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int len
     
     int available = open_devices[idx].ring_buffer.data_size;
     int to_read = (available < length) ? available : length;
+    
+    debug_printf("请求读取 %d 字节，可用 %d 字节，将读取 %d 字节", length, available, to_read);
     
     if (to_read > 0) {
         // 从环形缓冲区的末尾读取最新数据
@@ -371,7 +421,10 @@ USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int len
         if (available <= length) {
             open_devices[idx].ring_buffer.read_pos = open_devices[idx].ring_buffer.write_pos;
             open_devices[idx].ring_buffer.data_size = 0;
+            debug_printf("读取了所有可用数据，重置缓冲区");
         }
+    } else {
+        debug_printf("没有可用数据");
     }
     
     LeaveCriticalSection(&open_devices[idx].ring_buffer.cs);
@@ -397,7 +450,6 @@ DWORD WINAPI read_thread_func(LPVOID lpParameter) {
             // 检查环形缓冲区空间是否足够
             if (device->ring_buffer.data_size + actual_length > device->ring_buffer.size) {
                 // 空间不足，丢弃旧数据
-                // 需要丢弃的数据量
                 int discard = (device->ring_buffer.data_size + actual_length) - device->ring_buffer.size;
                 device->ring_buffer.read_pos = (device->ring_buffer.read_pos + discard) % device->ring_buffer.size;
                 device->ring_buffer.data_size -= discard;
@@ -436,7 +488,7 @@ DWORD WINAPI read_thread_func(LPVOID lpParameter) {
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:
-            // 初始化代码
+            // 初始化代码 - 不需要额外操作
             break;
         case DLL_PROCESS_DETACH:
             // 清理代码
@@ -444,6 +496,25 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
             // 确保所有设备关闭
             for (int i = 0; i < MAX_OPEN_DEVICES; i++) {
                 if (open_devices[i].is_open && open_devices[i].handle) {
+                    // 停止线程
+                    if (open_devices[i].read_thread) {
+                        open_devices[i].stop_thread = TRUE;
+                        // 使用超时等待，避免永久阻塞
+                        if (WaitForSingleObject(open_devices[i].read_thread, 1000) == WAIT_TIMEOUT) {
+                            // 如果1秒后线程仍未退出，则强制终止
+                            TerminateThread(open_devices[i].read_thread, 0);
+                        }
+                        CloseHandle(open_devices[i].read_thread);
+                        open_devices[i].read_thread = NULL;
+                    }
+                    
+                    // 释放缓冲区
+                    if (open_devices[i].ring_buffer.buffer) {
+                        DeleteCriticalSection(&open_devices[i].ring_buffer.cs);
+                        free(open_devices[i].ring_buffer.buffer);
+                    }
+                    
+                    // 释放设备
                     usb_device_release_interface(open_devices[i].handle, 0);
                     usb_device_close(open_devices[i].handle);
                     open_devices[i].is_open = 0;
