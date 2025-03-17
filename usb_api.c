@@ -10,10 +10,24 @@
 #include <string.h>
 #include <windows.h>
 #include <stdint.h>
+#include <process.h>  // 用于线程函数
 
 // 目标设备的VID和PID
 #define VENDOR_ID   0x1733          // 设备VID
 #define PRODUCT_ID  0xAABB          // 设备PID
+
+// 环形缓冲区大小 (10MB)
+#define RING_BUFFER_SIZE (10 * 1024 * 1024)
+
+// 环形缓冲区结构
+typedef struct {
+    unsigned char* buffer;       // 缓冲区指针
+    unsigned int size;           // 缓冲区大小
+    unsigned int write_pos;      // 写入位置
+    unsigned int read_pos;       // 读取位置
+    unsigned int data_size;      // 当前数据大小
+    CRITICAL_SECTION cs;         // 临界区，用于线程同步
+} ring_buffer_t;
 
 // 打开的设备信息
 #define MAX_OPEN_DEVICES 16
@@ -21,9 +35,18 @@ typedef struct {
     char serial[64];
     void* handle;
     int is_open;
+    
+    // 添加环形缓冲区和线程相关字段
+    ring_buffer_t ring_buffer;   // 环形缓冲区
+    HANDLE read_thread;          // 读取线程句柄
+    BOOL thread_running;         // 线程运行标志
+    BOOL stop_thread;            // 线程停止请求标志
 } open_device_t;
 
 static open_device_t open_devices[MAX_OPEN_DEVICES] = {0};
+
+// 线程函数前向声明
+DWORD WINAPI read_thread_func(LPVOID lpParameter);
 
 // 查找空闲设备槽
 static int find_free_device_slot(void) {
@@ -245,6 +268,25 @@ USB_API int USB_OpenDevice(const char* target_serial) {
         snprintf(open_devices[slot].serial, sizeof(open_devices[slot].serial) - 1, "%04X:%04X", VENDOR_ID, PRODUCT_ID);
     }
     
+    // 初始化环形缓冲区
+    open_devices[slot].ring_buffer.buffer = (unsigned char*)malloc(RING_BUFFER_SIZE);
+    open_devices[slot].ring_buffer.size = RING_BUFFER_SIZE;
+    open_devices[slot].ring_buffer.write_pos = 0;
+    open_devices[slot].ring_buffer.read_pos = 0;
+    open_devices[slot].ring_buffer.data_size = 0;
+    InitializeCriticalSection(&open_devices[slot].ring_buffer.cs);
+    
+    // 启动读取线程
+    open_devices[slot].read_thread = CreateThread(NULL, 0, read_thread_func, &open_devices[slot], 0, NULL);
+    if (!open_devices[slot].read_thread) {
+        free(open_devices[slot].ring_buffer.buffer);
+        open_devices[slot].ring_buffer.buffer = NULL;
+        return USB_ERROR_OTHER;
+    }
+    
+    open_devices[slot].thread_running = TRUE;
+    open_devices[slot].stop_thread = FALSE;
+    
     return slot;
 }
 
@@ -267,6 +309,18 @@ USB_API int USB_CloseDevice(const char* target_serial) {
         open_devices[idx].serial[0] = '\0';
     }
     
+    // 停止读取线程
+    open_devices[idx].stop_thread = TRUE;
+    WaitForSingleObject(open_devices[idx].read_thread, INFINITE);
+    CloseHandle(open_devices[idx].read_thread);
+    open_devices[idx].read_thread = NULL;
+    
+    // 释放环形缓冲区
+    if (open_devices[idx].ring_buffer.buffer) {
+        free(open_devices[idx].ring_buffer.buffer);
+        open_devices[idx].ring_buffer.buffer = NULL;
+    }
+    
     return USB_SUCCESS;
 }
 
@@ -285,16 +339,97 @@ USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int len
         return USB_ERROR_NOT_FOUND;
     }
     
-    int actual_length = 0;
-    int ret = usb_device_bulk_transfer(open_devices[idx].handle, 0x81, data, length, &actual_length, 1000);
+    // 从环形缓冲区读取最新的数据
+    EnterCriticalSection(&open_devices[idx].ring_buffer.cs);
     
-    if (ret == LIBUSB_SUCCESS) {
-        return actual_length;
-    } else if (ret == LIBUSB_ERROR_TIMEOUT) {
-        return 0;
-    } else {
-        return USB_ERROR_IO;
+    int available = open_devices[idx].ring_buffer.data_size;
+    int to_read = (available < length) ? available : length;
+    
+    if (to_read > 0) {
+        // 从环形缓冲区的末尾读取最新数据
+        int start_pos;
+        if (available <= length) {
+            // 可用数据少于请求的长度，返回所有可用数据
+            start_pos = open_devices[idx].ring_buffer.read_pos;
+        } else {
+            // 可用数据多于请求的长度，返回最新的length字节
+            start_pos = (open_devices[idx].ring_buffer.write_pos - length + RING_BUFFER_SIZE) % RING_BUFFER_SIZE;
+        }
+        
+        // 复制数据
+        if (start_pos + to_read <= RING_BUFFER_SIZE) {
+            // 连续数据块
+            memcpy(data, open_devices[idx].ring_buffer.buffer + start_pos, to_read);
+        } else {
+            // 环形缓冲区环绕，需要两次复制
+            int first_part = RING_BUFFER_SIZE - start_pos;
+            memcpy(data, open_devices[idx].ring_buffer.buffer + start_pos, first_part);
+            memcpy(data + first_part, open_devices[idx].ring_buffer.buffer, to_read - first_part);
+        }
+        
+        // 更新读取位置，但只有当我们读取的是完整的可用数据时才更新
+        if (available <= length) {
+            open_devices[idx].ring_buffer.read_pos = open_devices[idx].ring_buffer.write_pos;
+            open_devices[idx].ring_buffer.data_size = 0;
+        }
     }
+    
+    LeaveCriticalSection(&open_devices[idx].ring_buffer.cs);
+    
+    return to_read;
+}
+
+// 从USB设备读取线程函数
+DWORD WINAPI read_thread_func(LPVOID lpParameter) {
+    open_device_t* device = (open_device_t*)lpParameter;
+    unsigned char temp_buffer[4096]; // 临时缓冲区，用于读取数据
+    
+    while (!device->stop_thread) {
+        int actual_length = 0;
+        
+        // 从设备读取数据到临时缓冲区
+        int ret = usb_device_bulk_transfer(device->handle, 0x81, temp_buffer, sizeof(temp_buffer), &actual_length, 1000);
+        
+        if (ret == LIBUSB_SUCCESS && actual_length > 0) {
+            // 将数据写入环形缓冲区
+            EnterCriticalSection(&device->ring_buffer.cs);
+            
+            // 检查环形缓冲区空间是否足够
+            if (device->ring_buffer.data_size + actual_length > device->ring_buffer.size) {
+                // 空间不足，丢弃旧数据
+                // 需要丢弃的数据量
+                int discard = (device->ring_buffer.data_size + actual_length) - device->ring_buffer.size;
+                device->ring_buffer.read_pos = (device->ring_buffer.read_pos + discard) % device->ring_buffer.size;
+                device->ring_buffer.data_size -= discard;
+            }
+            
+            // 写入新数据
+            // 检查是否需要环绕写入
+            if (device->ring_buffer.write_pos + actual_length <= device->ring_buffer.size) {
+                // 直接写入
+                memcpy(device->ring_buffer.buffer + device->ring_buffer.write_pos, temp_buffer, actual_length);
+            } else {
+                // 需要环绕写入
+                int first_part = device->ring_buffer.size - device->ring_buffer.write_pos;
+                memcpy(device->ring_buffer.buffer + device->ring_buffer.write_pos, temp_buffer, first_part);
+                memcpy(device->ring_buffer.buffer, temp_buffer + first_part, actual_length - first_part);
+            }
+            
+            // 更新写入位置和数据大小
+            device->ring_buffer.write_pos = (device->ring_buffer.write_pos + actual_length) % device->ring_buffer.size;
+            device->ring_buffer.data_size += actual_length;
+            
+            LeaveCriticalSection(&device->ring_buffer.cs);
+        } else if (ret == LIBUSB_ERROR_TIMEOUT) {
+            // 超时，继续尝试
+            Sleep(10);
+        } else {
+            // 读取错误，暂停一下再试
+            Sleep(100);
+        }
+    }
+    
+    return 0;
 }
 
 // DLL入口点

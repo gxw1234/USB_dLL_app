@@ -11,7 +11,8 @@
 #include <stdarg.h>
 
 // 调试输出函数
-static void debug_printf(const char* format, ...) {
+void debug_printf(const char* format, ...) {
+#if USB_DEBUG_ENABLE == 0
     FILE* fp = fopen("usb_debug.log", "a");
     if (fp) {
         va_list args;
@@ -21,6 +22,7 @@ static void debug_printf(const char* format, ...) {
         va_end(args);
         fclose(fp);
     }
+#endif // USB_DEBUG_ENABLE == 0
 }
 
 // libusb函数指针类型定义
@@ -41,7 +43,7 @@ typedef int (*libusb_open_t)(void*, void**);
 // 全局变量
 static HMODULE hLibusbDll = NULL;
 void* g_libusb_context = NULL;
-static int g_is_initialized = 0;
+int g_is_initialized = 0;
 
 // 函数指针
 static libusb_init_t p_libusb_init;

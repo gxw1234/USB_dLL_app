@@ -7,6 +7,7 @@
 
 import os
 import ctypes
+import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, byref, Structure, POINTER, create_string_buffer
 
 # 定义设备信息结构体
@@ -35,7 +36,6 @@ def main():
         # 加载DLL
         usb_api = ctypes.CDLL(dll_path)
         print("成功加载DLL")
-        
         # 测试设备扫描
         max_devices = 10
         devices = (DeviceInfo * max_devices)()
@@ -44,27 +44,25 @@ def main():
         result = usb_api.USB_ScanDevice(ctypes.byref(devices), max_devices)
         
         print(f"扫描结果: {result}")
-        
         if result > 0:
             print(f"找到 {result} 个USB设备:")
-            
             for i in range(result):
                 serial = devices[i].serial.decode('utf-8', errors='ignore').strip('\x00')
                 desc = devices[i].description.decode('utf-8', errors='ignore').strip('\x00')
                 manufacturer = devices[i].manufacturer.decode('utf-8', errors='ignore').strip('\x00')
-                interface = devices[i].interface_str.decode('utf-8', errors='ignore').strip('\x00')
                 # 显示设备信息
                 print(f"设备 {i+1}:")
                 print(f"  序列号: {serial}")
                 print(f"  产品名称: {desc}")
                 print(f"  制造商: {manufacturer}")
-                print(f"  接口: {interface}")
                 print()
                 # 尝试打开设备
                 print(f"尝试打开设备: {serial}")
 
                 serial_param = create_string_buffer(serial.encode('utf-8'))
                 handle = usb_api.USB_OpenDevice(serial.encode('utf-8'))
+
+                time.sleep(1)
                 
                 if handle >= 0:
                     print(f"设备打开成功，句柄: {handle}")
