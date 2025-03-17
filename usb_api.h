@@ -22,6 +22,8 @@ typedef struct {
     unsigned short vendor_id;  // 厂商ID
     unsigned short product_id; // 产品ID
     char description[256];     // 设备描述
+    char manufacturer[256];    // 制造商
+    char interface_str[256];   // 接口（改名为interface_str避免关键字冲突）
 } device_info_t;
 
 /**

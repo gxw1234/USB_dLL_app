@@ -7,22 +7,23 @@
 
 import os
 import ctypes
-from ctypes import c_int, c_char, c_char_p, c_ubyte, byref, Structure, POINTER, create_string_buffer
+from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, byref, Structure, POINTER, create_string_buffer
 
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
         ("serial", c_char * 64),       # 设备序列号
-        ("vendor_id", c_int),          # 厂商ID
-        ("product_id", c_int),         # 产品ID
-        ("description", c_char * 256)  # 设备描述
+        ("vendor_id", c_ushort),       # 厂商ID
+        ("product_id", c_ushort),      # 产品ID
+        ("description", c_char * 256), # 设备描述
+        ("manufacturer", c_char * 256),# 制造商
+        ("interface_str", c_char * 256)# 接口
     ]
 
 def main():
     # 当前目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
     dll_path = os.path.join(current_dir, "usb_api.dll")
-    
     print(f"正在加载DLL: {dll_path}")
     
     # 检查DLL是否存在
@@ -49,19 +50,19 @@ def main():
             
             for i in range(result):
                 serial = devices[i].serial.decode('utf-8', errors='ignore').strip('\x00')
-                vid = devices[i].vendor_id
-                pid = devices[i].product_id
                 desc = devices[i].description.decode('utf-8', errors='ignore').strip('\x00')
-                
+                manufacturer = devices[i].manufacturer.decode('utf-8', errors='ignore').strip('\x00')
+                interface = devices[i].interface_str.decode('utf-8', errors='ignore').strip('\x00')
+                # 显示设备信息
                 print(f"设备 {i+1}:")
                 print(f"  序列号: {serial}")
-                print(f"  VID: 0x{vid:04X}")
-                print(f"  PID: 0x{pid:04X}")
-                print(f"  描述: {desc}")
+                print(f"  产品名称: {desc}")
+                print(f"  制造商: {manufacturer}")
+                print(f"  接口: {interface}")
                 print()
-                
                 # 尝试打开设备
                 print(f"尝试打开设备: {serial}")
+
                 serial_param = create_string_buffer(serial.encode('utf-8'))
                 handle = usb_api.USB_OpenDevice(serial_param)
                 

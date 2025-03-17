@@ -9,6 +9,11 @@
 #define VENDOR_ID   0x1733
 #define PRODUCT_ID  0xAABB
 
+// USB描述符字符串定义
+#define USBD_PRODUCT_STRING_HS     "GXW"
+#define USBD_INTERFACE_STRING_HS   "WINUSB Interface"
+#define USBD_MANUFACTURER_STRING   "STMicroelectronics"
+
 // libusb相关定义
 #define LIBUSB_SUCCESS          0
 #define LIBUSB_ERROR_TIMEOUT   -7
@@ -240,8 +245,31 @@ USB_API int USB_ScanDevice(device_info_t* devices, int max_devices) {
                 unsigned char desc_buffer[256] = {0};
                 if (p_libusb_get_string_descriptor_ascii(handle, desc.iProduct, desc_buffer, sizeof(desc_buffer)) > 0) {
                     strncpy(devices[device_count].description, (char*)desc_buffer, sizeof(devices[device_count].description) - 1);
+                } else {
+                    // 如果无法从设备获取描述，则使用预定义的字符串
+                    strncpy(devices[device_count].description, USBD_PRODUCT_STRING_HS, sizeof(devices[device_count].description) - 1);
                 }
+            } else {
+                // 如果设备没有提供产品描述符，则使用预定义的字符串
+                strncpy(devices[device_count].description, USBD_PRODUCT_STRING_HS, sizeof(devices[device_count].description) - 1);
             }
+            
+            // 获取制造商信息
+            if (desc.iManufacturer > 0) {
+                unsigned char manufacturer_buffer[256] = {0};
+                if (p_libusb_get_string_descriptor_ascii(handle, desc.iManufacturer, manufacturer_buffer, sizeof(manufacturer_buffer)) > 0) {
+                    strncpy(devices[device_count].manufacturer, (char*)manufacturer_buffer, sizeof(devices[device_count].manufacturer) - 1);
+                } else {
+                    // 如果无法从设备获取制造商信息，则使用预定义的字符串
+                    strncpy(devices[device_count].manufacturer, USBD_MANUFACTURER_STRING, sizeof(devices[device_count].manufacturer) - 1);
+                }
+            } else {
+                // 如果设备没有提供制造商描述符，则使用预定义的字符串
+                strncpy(devices[device_count].manufacturer, USBD_MANUFACTURER_STRING, sizeof(devices[device_count].manufacturer) - 1);
+            }
+            
+            // 设置接口信息（从libusb无法直接获取接口字符串描述符，因此使用预定义的字符串）
+            strncpy(devices[device_count].interface_str, USBD_INTERFACE_STRING_HS, sizeof(devices[device_count].interface_str) - 1);
             
             // 关闭设备句柄
             p_libusb_close(handle);
