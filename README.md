@@ -71,16 +71,3 @@ int USB_ReadData(const char* target_serial, unsigned char* data, int length);
 
 - libusb-1.0.dll: 需要放在程序目录下或系统路径中
 
---------------------
-编译命令：
-build.bat
-
---------------------
-
-日志文件：
-usb_debug.log
-日志开关：
-USB_DEBUG_ENABLE
-当 USB_DEBUG_ENABLE = 0 时，生成日志
-当 USB_DEBUG_ENABLE = 1 时，不生成日志
---------------------
