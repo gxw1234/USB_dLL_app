@@ -8,12 +8,12 @@ extern "C" {
 // 动态库导出宏定义
 #ifdef _WIN32
     #ifdef USB_API_EXPORTS
-        #define USB_API __declspec(dllexport)
+        #define WINAPI __declspec(dllexport) __stdcall
     #else
-        #define USB_API __declspec(dllimport)
+        #define WINAPI __declspec(dllimport) __stdcall
     #endif
 #else
-    #define USB_API
+    #define WINAPI
 #endif
 
 // 设备信息结构体
@@ -33,23 +33,23 @@ typedef struct {
  * @param max_devices 数组的最大容量
  * @return int 成功扫描到的设备数量，小于0表示错误
  */
-USB_API int USB_ScanDevice(device_info_t* devices, int max_devices);
+WINAPI int USB_ScanDevice(device_info_t* devices, int max_devices);
 
 /**
  * @brief 打开指定序列号的USB设备
  * 
- * @param target_serial 目标设备的序列号，如果为NULL则打开第一个可用设备
+ * @param DevHandle 目标设备的序列号，如果为NULL则打开第一个可用设备
  * @return int 成功返回设备句柄(≥0)，失败返回错误代码(<0)
  */
-USB_API int USB_OpenDevice(const char* target_serial);
+WINAPI int USB_OpenDevice(const char* DevHandle);
 
 /**
  * @brief 关闭USB设备
  * 
- * @param target_serial 目标设备的序列号
+ * @param DevHandle 目标设备的序列号
  * @return int 成功返回0，失败返回错误代码
  */
-USB_API int USB_CloseDevice(const char* target_serial);
+WINAPI int USB_CloseDevice(const char* DevHandle);
 
 /**
  * @brief 从USB设备读取数据
@@ -59,7 +59,7 @@ USB_API int USB_CloseDevice(const char* target_serial);
  * @param length 要读取的数据长度
  * @return int 实际读取的数据长度，小于0表示错误
  */
-USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int length);
+WINAPI int USB_ReadData(const char* target_serial, unsigned char* data, int length);
 
 // 错误代码定义
 #define USB_SUCCESS             0    // 成功

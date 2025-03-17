@@ -73,7 +73,7 @@ static int find_device_by_serial(const char* serial) {
 }
 
 // 扫描USB设备实现
-USB_API int USB_ScanDevice(device_info_t* devices, int max_devices) {
+WINAPI int USB_ScanDevice(device_info_t* devices, int max_devices) {
     if (!devices || max_devices <= 0) {
         return USB_ERROR_INVALID_PARAM;
     }
@@ -156,7 +156,7 @@ USB_API int USB_ScanDevice(device_info_t* devices, int max_devices) {
 }
 
 // 打开USB设备实现
-USB_API int USB_OpenDevice(const char* target_serial) {
+WINAPI int USB_OpenDevice(const char* target_serial) {
     // 初始化设备层
     int ret = usb_device_init();
     if (ret != USB_SUCCESS) {
@@ -320,7 +320,7 @@ USB_API int USB_OpenDevice(const char* target_serial) {
 }
 
 // 关闭USB设备实现
-USB_API int USB_CloseDevice(const char* target_serial) {
+WINAPI int USB_CloseDevice(const char* target_serial) {
     if (!target_serial) {
         return USB_ERROR_INVALID_PARAM;
     }
@@ -364,7 +364,7 @@ USB_API int USB_CloseDevice(const char* target_serial) {
 }
 
 // 从USB设备读取数据实现
-USB_API int USB_ReadData(const char* target_serial, unsigned char* data, int length) {
+WINAPI int USB_ReadData(const char* target_serial, unsigned char* data, int length) {
     if (!target_serial || !data || length <= 0) {
         debug_printf("无效的参数: target_serial=%p, data=%p, length=%d", target_serial, data, length);
         return USB_ERROR_INVALID_PARAM;

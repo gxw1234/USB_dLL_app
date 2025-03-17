@@ -59,8 +59,8 @@ def main():
                 # 尝试打开设备
                 print(f"尝试打开设备: {serial}")
 
-                serial_param = create_string_buffer(serial.encode('utf-8'))
-                handle = usb_api.USB_OpenDevice(serial.encode('utf-8'))
+                serial_param =serial.encode('utf-8')
+                handle = usb_api.USB_OpenDevice(serial_param)
 
                 time.sleep(1)
                 
