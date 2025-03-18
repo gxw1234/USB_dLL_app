@@ -24,7 +24,7 @@ class DeviceInfo(Structure):
 def main():
     # 当前目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    dll_path = os.path.join(current_dir, "usb_application.dll")
+    dll_path = os.path.join(current_dir, "USB_G2X.dll")
     print(f"正在加载DLL: {dll_path}")
     
     # 检查DLL是否存在
@@ -36,6 +36,13 @@ def main():
     # 加载DLL
     usb_application = ctypes.CDLL(dll_path)
     print("成功加载DLL")
+    
+    # 启用日志功能（可选）
+    print("启用USB调试日志...")
+    # 定义函数类型
+    # 调用日志开关函数，参数1表示开启
+    usb_application.USB_SetLogging(1)
+    
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
@@ -71,7 +78,7 @@ def main():
         print("未扫描到设备")
         return
 
-    print(f"尝试打开设备: {serial}")
+    print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
     serial_param = devices[0].serial    #打开第一个设备
     # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     

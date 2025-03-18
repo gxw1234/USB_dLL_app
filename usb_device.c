@@ -4,26 +4,18 @@
  */
 
 #include "usb_device.h"
+#include "usb_log.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
 
-// 调试输出函数
-void debug_printf(const char* format, ...) {
-#if USB_DEBUG_ENABLE == 0
-    FILE* fp = fopen("usb_debug.log", "a");
-    if (fp) {
-        va_list args;
-        va_start(args, format);
-        vfprintf(fp, format, args);
-        fprintf(fp, "\n");
-        va_end(args);
-        fclose(fp);
-    }
-#endif // USB_DEBUG_ENABLE == 0
-}
+// 全局变量
+static HMODULE hLibusbDll = NULL;
+void* g_libusb_context = NULL;
+int g_is_initialized = 0;
 
 // libusb函数指针类型定义
 typedef int (*libusb_init_t)(void**);
@@ -39,11 +31,6 @@ typedef int (*libusb_get_device_descriptor_t)(void*, void*);
 typedef int (*libusb_get_string_descriptor_ascii_t)(void*, unsigned char, unsigned char*, int);
 typedef void* (*libusb_get_device_t)(void*);
 typedef int (*libusb_open_t)(void*, void**);
-
-// 全局变量
-static HMODULE hLibusbDll = NULL;
-void* g_libusb_context = NULL;
-int g_is_initialized = 0;
 
 // 函数指针
 static libusb_init_t p_libusb_init;
@@ -69,7 +56,7 @@ int usb_device_init(void) {
         return USB_SUCCESS;
     }
 
-    // 加载libusb动态库
+    // 加载libusb DLL
     debug_printf("尝试加载libusb-1.0.dll");
     hLibusbDll = LoadLibrary("libusb-1.0.dll");
     if (!hLibusbDll) {
@@ -82,23 +69,21 @@ int usb_device_init(void) {
     p_libusb_init = (libusb_init_t)GetProcAddress(hLibusbDll, "libusb_init");
     p_libusb_exit = (libusb_exit_t)GetProcAddress(hLibusbDll, "libusb_exit");
     p_libusb_open_device_with_vid_pid = (libusb_open_device_with_vid_pid_t)GetProcAddress(hLibusbDll, "libusb_open_device_with_vid_pid");
-    p_libusb_claim_interface = (libusb_claim_interface_t)GetProcAddress(hLibusbDll, "libusb_claim_interface");
-    p_libusb_bulk_transfer = (libusb_bulk_transfer_t)GetProcAddress(hLibusbDll, "libusb_bulk_transfer");
     p_libusb_close = (libusb_close_t)GetProcAddress(hLibusbDll, "libusb_close");
+    p_libusb_claim_interface = (libusb_claim_interface_t)GetProcAddress(hLibusbDll, "libusb_claim_interface");
     p_libusb_release_interface = (libusb_release_interface_t)GetProcAddress(hLibusbDll, "libusb_release_interface");
+    p_libusb_bulk_transfer = (libusb_bulk_transfer_t)GetProcAddress(hLibusbDll, "libusb_bulk_transfer");
     p_libusb_get_device_list = (libusb_get_device_list_t)GetProcAddress(hLibusbDll, "libusb_get_device_list");
     p_libusb_free_device_list = (libusb_free_device_list_t)GetProcAddress(hLibusbDll, "libusb_free_device_list");
     p_libusb_get_device_descriptor = (libusb_get_device_descriptor_t)GetProcAddress(hLibusbDll, "libusb_get_device_descriptor");
     p_libusb_get_string_descriptor_ascii = (libusb_get_string_descriptor_ascii_t)GetProcAddress(hLibusbDll, "libusb_get_string_descriptor_ascii");
     p_libusb_get_device = (libusb_get_device_t)GetProcAddress(hLibusbDll, "libusb_get_device");
     p_libusb_open = (libusb_open_t)GetProcAddress(hLibusbDll, "libusb_open");
-
-    // 验证所有函数指针
-    if (!p_libusb_init || !p_libusb_exit || !p_libusb_open_device_with_vid_pid || 
-        !p_libusb_claim_interface || !p_libusb_bulk_transfer || !p_libusb_close ||
-        !p_libusb_release_interface || !p_libusb_get_device_list || !p_libusb_free_device_list ||
-        !p_libusb_get_device_descriptor || !p_libusb_get_string_descriptor_ascii ||
-        !p_libusb_get_device || !p_libusb_open) {
+    
+    if (!p_libusb_init || !p_libusb_exit || !p_libusb_open_device_with_vid_pid || !p_libusb_close ||
+        !p_libusb_claim_interface || !p_libusb_bulk_transfer || !p_libusb_release_interface ||
+        !p_libusb_get_device_list || !p_libusb_free_device_list || !p_libusb_get_device_descriptor ||
+        !p_libusb_get_string_descriptor_ascii || !p_libusb_get_device || !p_libusb_open) {
         debug_printf("获取函数指针失败");
         FreeLibrary(hLibusbDll);
         hLibusbDll = NULL;
@@ -202,7 +187,7 @@ int usb_device_get_string_descriptor_ascii(void* handle, uint8_t desc_index, uns
         return -1;
     }
     int ret = p_libusb_get_string_descriptor_ascii(handle, desc_index, data, length);
-    if (ret != 0) {
+    if (ret < 0) {
         debug_printf("获取字符串描述符失败, 错误码: %d", ret);
     }
     return ret;
@@ -211,46 +196,33 @@ int usb_device_get_string_descriptor_ascii(void* handle, uint8_t desc_index, uns
 // 申请接口
 int usb_device_claim_interface(void* handle, int interface_number) {
     if (!g_is_initialized || !handle) {
-        debug_printf("申请接口失败: 未初始化或参数无效");
         return -1;
     }
     int ret = p_libusb_claim_interface(handle, interface_number);
-    if (ret != 0) {
-        debug_printf("申请接口失败, 错误码: %d", ret);
-    }
     return ret;
 }
 
 // 释放接口
 int usb_device_release_interface(void* handle, int interface_number) {
     if (!g_is_initialized || !handle) {
-        debug_printf("释放接口失败: 未初始化或参数无效");
         return -1;
     }
     int ret = p_libusb_release_interface(handle, interface_number);
-    if (ret != 0) {
-        debug_printf("释放接口失败, 错误码: %d", ret);
-    }
     return ret;
 }
 
 // 批量传输
 int usb_device_bulk_transfer(void* handle, unsigned char endpoint, unsigned char* data, int length, int* transferred, unsigned int timeout) {
     if (!g_is_initialized || !handle || !data || length <= 0 || !transferred) {
-        debug_printf("批量传输失败: 未初始化或参数无效");
         return -1;
     }
     int ret = p_libusb_bulk_transfer(handle, endpoint, data, length, transferred, timeout);
-    if (ret != 0) {
-        debug_printf("批量传输失败, 错误码: %d", ret);
-    }
     return ret;
 }
 
 // 获取设备
 void* usb_device_get_device(void* handle) {
     if (!g_is_initialized || !handle) {
-        debug_printf("获取设备失败: 未初始化或参数无效");
         return NULL;
     }
     return p_libusb_get_device(handle);
@@ -259,7 +231,6 @@ void* usb_device_get_device(void* handle) {
 // 打开指定VID和PID的设备
 void* usb_device_open_device_with_vid_pid(void* ctx, unsigned short vid, unsigned short pid) {
     if (!g_is_initialized) {
-        debug_printf("打开指定VID和PID的设备失败: 未初始化");
         return NULL;
     }
     return p_libusb_open_device_with_vid_pid(ctx ? ctx : g_libusb_context, vid, pid);

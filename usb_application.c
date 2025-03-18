@@ -484,6 +484,15 @@ DWORD WINAPI read_thread_func(LPVOID lpParameter) {
     return 0;
 }
 
+/**
+ * @brief 设置USB调试日志状态
+ * 
+ * @param enable 1=开启日志，0=关闭日志
+ */
+WINAPI void USB_SetLogging(int enable) {
+    USB_SetLog(enable);
+}
+
 // DLL入口点
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {

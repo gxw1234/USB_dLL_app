@@ -22,7 +22,7 @@ def main():
     print("USB连续读取测试 - 读取1000次，每次4096字节")
     
     # 加载DLL
-    dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usb_application.dll")
+    dll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "USB_G2X.dll")
     print(f"正在加载DLL: {dll_path}")
     
     try:

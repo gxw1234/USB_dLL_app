@@ -12,9 +12,7 @@ extern "C" {
 
 #include <windows.h>
 #include <stdint.h>
-
-// 调试开关，0=开启日志，1=关闭日志
-#define USB_DEBUG_ENABLE 1
+#include "usb_log.h"
 
 // libusb相关定义
 #define LIBUSB_SUCCESS         0
@@ -66,9 +64,6 @@ void* usb_device_open_device_with_vid_pid(void* ctx, unsigned short vid, unsigne
 // libusb上下文管理
 extern void* g_libusb_context;
 extern int g_is_initialized;
-
-// 调试输出函数声明
-void debug_printf(const char* format, ...);
 
 #ifdef __cplusplus
 }

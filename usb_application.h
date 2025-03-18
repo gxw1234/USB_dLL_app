@@ -61,6 +61,14 @@ WINAPI int USB_CloseDevice(const char* DevHandle);
  */
 WINAPI int USB_ReadData(const char* target_serial, unsigned char* data, int length);
 
+/**
+ * @brief 设置USB调试日志状态
+ * 
+ * @param enable 1=开启日志，0=关闭日志
+ * 开启后，USB操作将记录详细日志到usb_debug.log文件
+ */
+WINAPI void USB_SetLogging(int enable);
+
 // 错误代码定义
 #define USB_SUCCESS             0    // 成功
 #define USB_ERROR_NOT_FOUND    -1    // 设备未找到
