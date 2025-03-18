@@ -1,9 +1,9 @@
 /**
- * @file usb_api.c
- * @brief USB API公共接口实现
+ * @file usb_application.c
+ * @brief USB应用层公共接口实现
  */
 
-#include "usb_api.h"
+#include "usb_application.h"
 #include "usb_device.h"
 #include <stdio.h>
 #include <stdlib.h>

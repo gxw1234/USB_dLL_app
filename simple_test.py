@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-简单的USB API测试脚本
+简单的USB应用层测试脚本
 """
 
 import os
@@ -24,7 +24,7 @@ class DeviceInfo(Structure):
 def main():
     # 当前目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    dll_path = os.path.join(current_dir, "usb_api.dll")
+    dll_path = os.path.join(current_dir, "usb_application.dll")
     print(f"正在加载DLL: {dll_path}")
     
     # 检查DLL是否存在
@@ -34,7 +34,7 @@ def main():
     
    
     # 加载DLL
-    usb_api = ctypes.CDLL(dll_path)
+    usb_application = ctypes.CDLL(dll_path)
     print("成功加载DLL")
     # 测试设备扫描
     max_devices = 10
@@ -52,7 +52,7 @@ def main():
     #   >=0: 实际扫描到的设备数量
     #   <0: 发生错误，返回错误代码
     # ===================================================
-    result = usb_api.USB_ScanDevice(ctypes.byref(devices), max_devices)
+    result = usb_application.USB_ScanDevice(ctypes.byref(devices), max_devices)
 
     print(f"扫描结果: {result}")
     if result > 0:
@@ -67,10 +67,12 @@ def main():
             print(f"  产品名称: {desc}")
             print(f"  制造商: {manufacturer}")
             print()
-            # 尝试打开设备
-            print(f"尝试打开设备: {serial}")
+    else:
+        print("未扫描到设备")
+        return
 
-    serial_param = devices[i].serial
+    print(f"尝试打开设备: {serial}")
+    serial_param = devices[0].serial    #打开第一个设备
     # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     
     # ===================================================
@@ -82,7 +84,7 @@ def main():
     #   >=0: 成功打开设备，返回设备句柄
     #   <0: 打开失败，返回错误代码
     # ===================================================
-    handle = usb_api.USB_OpenDevice(serial_param)
+    handle = usb_application.USB_OpenDevice(serial_param)
 
     time.sleep(1)
     if handle >= 0:
@@ -106,7 +108,7 @@ def main():
         #   =0: 超时，未读取到数据
         #   <0: 读取失败，返回错误代码
         # ===================================================
-        read_result = usb_api.USB_ReadData(serial_param, buffer, buffer_size)
+        read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
         
         if read_result > 0:
             print(f"成功读取 {read_result} 字节数据")
@@ -131,7 +133,7 @@ def main():
         #   =0: 设备成功关闭
         #   <0: 关闭失败，返回错误代码
         # ===================================================
-        close_result = usb_api.USB_CloseDevice(serial_param)
+        close_result = usb_application.USB_CloseDevice(serial_param)
         if close_result == 0:
             print("设备关闭成功")
 

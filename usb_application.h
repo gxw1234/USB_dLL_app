@@ -1,5 +1,5 @@
-#ifndef USB_API_H
-#define USB_API_H
+#ifndef USB_APPLICATION_H
+#define USB_APPLICATION_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,4 +73,4 @@ WINAPI int USB_ReadData(const char* target_serial, unsigned char* data, int leng
 }
 #endif
 
-#endif // USB_API_H
+#endif // USB_APPLICATION_H
