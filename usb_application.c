@@ -485,6 +485,48 @@ DWORD WINAPI read_thread_func(LPVOID lpParameter) {
 }
 
 /**
+ * @brief 向USB设备发送数据
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param data 要发送的数据缓冲区
+ * @param length 要发送的数据长度
+ * @return int 实际发送的数据长度，小于0表示错误
+ */
+WINAPI int USB_WriteData(const char* target_serial, unsigned char* data, int length) {
+    // 验证参数
+    if (!target_serial || !data || length <= 0) {
+        debug_printf("参数无效: target_serial=%p, data=%p, length=%d", target_serial, data, length);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    // 查找已打开的设备
+    int idx = find_device_by_serial(target_serial);
+    if (idx < 0) {
+        debug_printf("设备未找到或未打开: %s", target_serial);
+        return USB_ERROR_NOT_FOUND;
+    }
+    
+    // 获取设备句柄
+    void* handle = open_devices[idx].handle;
+    if (!handle) {
+        debug_printf("设备句柄无效: %s", target_serial);
+        return USB_ERROR_NOT_FOUND;
+    }
+    
+    // 准备发送数据 (端点1是OUT端点)
+    int transferred = 0;
+    int ret = usb_device_bulk_transfer(handle, 0x01, data, length, &transferred, 1000);
+    
+    if (ret != 0) {
+        debug_printf("发送数据失败: %d", ret);
+        return USB_ERROR_IO;
+    }
+    
+    debug_printf("成功发送 %d 字节数据", transferred);
+    return transferred;
+}
+
+/**
  * @brief 设置USB调试日志状态
  * 
  * @param enable 1=开启日志，0=关闭日志

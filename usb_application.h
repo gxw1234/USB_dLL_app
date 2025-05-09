@@ -23,7 +23,7 @@ typedef struct {
     unsigned short product_id; // 产品ID
     char description[256];     // 设备描述
     char manufacturer[256];    // 制造商
-    char interface_str[256];   // 接口（改名为interface_str避免关键字冲突）
+    char interface_str[256];   
 } device_info_t;
 
 /**
@@ -60,6 +60,16 @@ WINAPI int USB_CloseDevice(const char* DevHandle);
  * @return int 实际读取的数据长度，小于0表示错误
  */
 WINAPI int USB_ReadData(const char* target_serial, unsigned char* data, int length);
+
+/**
+ * @brief 向USB设备发送数据
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param data 要发送的数据缓冲区
+ * @param length 要发送的数据长度
+ * @return int 实际发送的数据长度，小于0表示错误
+ */
+WINAPI int USB_WriteData(const char* target_serial, unsigned char* data, int length);
 
 /**
  * @brief 设置USB调试日志状态

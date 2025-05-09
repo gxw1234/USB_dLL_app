@@ -73,7 +73,7 @@ def main():
     print(f"设备打开成功: {ret}")
     
     # 连续读取数据
-    buffer_size = 4096
+    buffer_size = 40960
     read_count = 1000  # 固定读取1000次
     buffer = (ctypes.c_ubyte * buffer_size)()
     

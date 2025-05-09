@@ -8,7 +8,7 @@
 import os
 import ctypes
 import time
-from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, byref, Structure, POINTER, create_string_buffer
+from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
 
 # 定义设备信息结构体
 class DeviceInfo(Structure):
@@ -19,6 +19,18 @@ class DeviceInfo(Structure):
         ("description", c_char * 256), # 设备描述
         ("manufacturer", c_char * 256),# 制造商
         ("interface_str", c_char * 256)# 接口
+    ]
+
+# 定义SPI配置结构体
+class SPI_CONFIG(Structure):
+    _fields_ = [
+        ("Mode", c_char),              # SPI控制方式
+        ("Master", c_char),            # 主从选择控制
+        ("CPOL", c_char),              # 时钟极性控制
+        ("CPHA", c_char),              # 时钟相位控制
+        ("LSBFirst", c_char),          # 数据移位方式
+        ("SelPolarity", c_char),       # 片选信号极性
+        ("ClockSpeedHz", c_uint)       # SPI时钟频率
     ]
 
 def main():
@@ -80,8 +92,8 @@ def main():
 
     print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
     serial_param = devices[0].serial    #打开第一个设备
-    # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     
+    # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     # ===================================================
     # 函数: USB_OpenDevice
     # 描述: 打开指定序列号的USB设备
@@ -92,17 +104,13 @@ def main():
     #   <0: 打开失败，返回错误代码
     # ===================================================
     handle = usb_application.USB_OpenDevice(serial_param)
-
     time.sleep(1)
     if handle >= 0:
         print(f"设备打开成功，句柄: {handle}")
-        
         # 读取数据
         buffer_size = 102400
         buffer = (c_ubyte * buffer_size)()
-        
         print("尝试读取数据...")
-        
         # ===================================================
         # 函数: USB_ReadData
         # 描述: 从USB设备读取数据
@@ -115,6 +123,7 @@ def main():
         #   =0: 超时，未读取到数据
         #   <0: 读取失败，返回错误代码
         # ===================================================
+
         read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
         
         if read_result > 0:
@@ -129,7 +138,73 @@ def main():
             print(f"读取失败，错误代码: {read_result}")
         
         # 关闭设备
-        print("关闭设备...")
+        # 测试数据发送功能
+        print("\n准备发送测试数据...")
+        # 创建测试数据
+        test_data = b"Hello STM32! This is a test message from USB application."
+        test_buffer = (c_ubyte * len(test_data))()
+        for i in range(len(test_data)):
+            test_buffer[i] = test_data[i]
+            
+        print(f"发送数据: {test_data.decode('utf-8')}")
+        
+        # ===================================================
+        # 函数: USB_WriteData
+        # 描述: 向USB设备发送数据
+        # 参数:
+        #   serial_param: 设备序列号
+        #   buffer: 要发送的数据缓冲区
+        #   length: 要发送的数据长度(字节)
+        # 返回值:
+        #   >0: 实际发送的数据长度
+        #   <0: 发送失败，返回错误代码
+        # ===================================================
+        # 定义 USB_WriteData 函数参数类型
+        usb_application.USB_WriteData.argtypes = [c_char_p, POINTER(c_ubyte), c_int]
+        usb_application.USB_WriteData.restype = c_int
+        
+        # 调用 USB_WriteData 函数
+        write_result = usb_application.USB_WriteData(serial_param, test_buffer, len(test_data))
+        
+        if write_result > 0:
+            print(f"成功发送 {write_result} 字节数据，现在可以查看STM32串口输出查看接收到的数据")
+        else:
+            print(f"发送失败，错误代码: {write_result}")
+            
+        # 等待一下，给设备处理时间
+        time.sleep(1)
+        
+        print("\n测试SPI初始化功能...")
+        # 定义SPI相关常量
+        SPI1_CS0 = 0
+        SPI_SUCCESS = 0
+        
+        # 创建SPI配置结构体
+        spi_config = SPI_CONFIG()
+        spi_config.Mode = c_char(0)              # 硬件控制（全双工模式）
+        spi_config.Master = c_char(1)          # 主机模式
+        spi_config.CPOL = c_char(0)            # SCK空闲时为低电平
+        spi_config.CPHA = c_char(0)            # 第一个SCK时钟采样
+        spi_config.LSBFirst = c_char(0)        # MSB在前
+        spi_config.SelPolarity = c_char(0)     # 低电平选中
+        spi_config.ClockSpeedHz = c_uint(25000000)  # 25MHz
+        
+        # 定义 SPI_Init 函数参数类型
+        usb_application.SPI_Init.argtypes = [c_char_p, c_int, POINTER(SPI_CONFIG)]
+        usb_application.SPI_Init.restype = c_int
+        
+        # 调用 SPI_Init 函数
+        spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
+        
+        if spi_init_result == SPI_SUCCESS:
+            print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
+        else:
+            print(f"SPI初始化失败，错误代码: {spi_init_result}")
+        
+        # 等待一下，给设备处理时间
+        time.sleep(1)
+        
+        print("\n关闭设备...")
         
         # ===================================================
         # 函数: USB_CloseDevice
@@ -140,6 +215,7 @@ def main():
         #   =0: 设备成功关闭
         #   <0: 关闭失败，返回错误代码
         # ===================================================
+
         close_result = usb_application.USB_CloseDevice(serial_param)
         if close_result == 0:
             print("设备关闭成功")
