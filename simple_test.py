@@ -136,44 +136,6 @@ def main():
             print("超时，未读取到数据")
         else:
             print(f"读取失败，错误代码: {read_result}")
-        
-        # 关闭设备
-        # 测试数据发送功能
-        print("\n准备发送测试数据...")
-        # 创建测试数据
-        test_data = b"Hello STM32! This is a test message from USB application."
-        test_buffer = (c_ubyte * len(test_data))()
-        for i in range(len(test_data)):
-            test_buffer[i] = test_data[i]
-            
-        print(f"发送数据: {test_data.decode('utf-8')}")
-        
-        # ===================================================
-        # 函数: USB_WriteData
-        # 描述: 向USB设备发送数据
-        # 参数:
-        #   serial_param: 设备序列号
-        #   buffer: 要发送的数据缓冲区
-        #   length: 要发送的数据长度(字节)
-        # 返回值:
-        #   >0: 实际发送的数据长度
-        #   <0: 发送失败，返回错误代码
-        # ===================================================
-        # 定义 USB_WriteData 函数参数类型
-        usb_application.USB_WriteData.argtypes = [c_char_p, POINTER(c_ubyte), c_int]
-        usb_application.USB_WriteData.restype = c_int
-        
-        # 调用 USB_WriteData 函数
-        write_result = usb_application.USB_WriteData(serial_param, test_buffer, len(test_data))
-        
-        if write_result > 0:
-            print(f"成功发送 {write_result} 字节数据，现在可以查看STM32串口输出查看接收到的数据")
-        else:
-            print(f"发送失败，错误代码: {write_result}")
-            
-        # 等待一下，给设备处理时间
-        time.sleep(1)
-        
         print("\n测试SPI初始化功能...")
         # 定义SPI相关常量
         SPI1_CS0 = 0
@@ -181,23 +143,66 @@ def main():
         
         # 创建SPI配置结构体
         spi_config = SPI_CONFIG()
-        spi_config.Mode = c_char(0)              # 硬件控制（全双工模式）
-        spi_config.Master = c_char(1)          # 主机模式
-        spi_config.CPOL = c_char(0)            # SCK空闲时为低电平
-        spi_config.CPHA = c_char(0)            # 第一个SCK时钟采样
-        spi_config.LSBFirst = c_char(0)        # MSB在前
-        spi_config.SelPolarity = c_char(0)     # 低电平选中
-        spi_config.ClockSpeedHz = c_uint(25000000)  # 25MHz
-        
+        spi_config.Mode = 0              # 硬件控制（全双工模式）
+        spi_config.Master = 1          # 主机模式
+        spi_config.CPOL = 0           
+        spi_config.CPHA = 0           
+        spi_config.LSBFirst = 0        # MSB在前
+        spi_config.SelPolarity = 0    
+        spi_config.ClockSpeedHz = 25000000  # 25MHz
+        # ===================================================
+        # 函数: SPI_Init
+        # 描述: 初始化SPI设备
+        # 参数:
+        #   serial_param: 设备序列号
+        #   SPIIndex: SPI索引，指定使用哪个SPI接口和片选
+        #   spi_config: SPI配置结构体，包含SPI模式、主从设置、时钟极性等参数
+        # 返回值:
+        #   =0: 成功初始化SPI
+        #   <0: 初始化失败，返回错误代码
+        # ===================================================
         # 定义 SPI_Init 函数参数类型
-        usb_application.SPI_Init.argtypes = [c_char_p, c_int, POINTER(SPI_CONFIG)]
-        usb_application.SPI_Init.restype = c_int
-        
-        # 调用 SPI_Init 函数
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
-        
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
+            SPIIndex = SPI1_CS0
+            write_buffer_size = 20 * 1024  # 20KB
+            write_buffer = (c_ubyte * write_buffer_size)()
+            
+            # 生成测试数据
+            for i in range(write_buffer_size):
+                write_buffer[i] = i % 256
+            
+            # 只发送前10个字节进行测试，避免数据过多
+            test_size = 10
+            print(f"发送的前{test_size}个字节数据: ", end="")
+            for i in range(test_size):
+                print(f"{write_buffer[i]:02X} ", end="")
+            print()
+            
+            # ===================================================
+            # 函数: SPI_WriteBytes
+            # 描述: 通过SPI发送数据
+            # 参数:
+            #   serial_param: 设备序列号
+            #   SPIIndex: SPI索引，指定使用哪个SPI接口和片选
+            #   write_buffer: 要发送的数据缓冲区
+            #   test_size: 要发送的数据长度(字节)
+            # 返回值:
+            #   =0: 成功发送SPI数据
+            #   <0: 发送失败，返回错误代码
+            # ===================================================
+            # 定义SPI_WriteBytes函数参数类型
+            usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
+            usb_application.SPI_WriteBytes.restype = c_int
+            
+            # 调用SPI_WriteBytes函数发送数据
+            write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, test_size)
+            
+            if write_result == SPI_SUCCESS:
+                print(f"成功发送SPI写数据命令，发送了{test_size}字节数据，")
+            else:
+                print(f"发送SPI写数据失败，错误代码: {write_result}")
         else:
             print(f"SPI初始化失败，错误代码: {spi_init_result}")
         

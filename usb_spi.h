@@ -57,6 +57,17 @@ typedef struct _CMD_HEADER {
  */
 WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig);
 
+/**
+ * @brief 通过SPI发送数据
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param SPIIndex SPI索引
+ * @param pWriteBuffer 要发送的数据缓冲区
+ * @param WriteLen 要发送的数据长度
+ * @return int 成功返回0，失败返回错误代码
+ */
+WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
+
 #ifdef __cplusplus
 }
 #endif
