@@ -20,17 +20,7 @@ class DeviceInfo(Structure):
         ("manufacturer", c_char * 256),# 制造商
         ("interface_str", c_char * 256)# 接口
     ]
-class SPI_CONFIG(Structure):
-    _fields_ = [
-        ("Mode", c_char),              # SPI控制方式
-        ("Master", c_char),            # 主从选择控制
-        ("CPOL", c_char),              # 时钟极性控制
-        ("CPHA", c_char),              # 时钟相位控制
-        ("LSBFirst", c_char),          # 数据移位方式
-        ("SelPolarity", c_char),       # 片选信号极性
-        ("ClockSpeedHz", c_uint)       # SPI时钟频率
-    ]
-    
+
 class VOLTAGE_CONFIG(Structure):
     _fields_ = [
         ("channel", c_ubyte),        # 电源通道
@@ -128,11 +118,100 @@ def main():
         print(f"设置电压: 通道={POWER_CHANNEL_1}, 电压={voltage_mv}mV")
         power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 186)
         if power_result == POWER_SUCCESS:
-            print(f"成功发送设置电压命令，现在可以查看STM32串口输出")
+            print(f"成功发送设置电压命令，")
         else:
             print(f"设置电压失败，错误代码: {power_result}")
         time.sleep(1)
         print("\n关闭设备...")
+        power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
+        if power_result == POWER_SUCCESS:
+            print(f"开始读取")
+        else:
+            print(f"开始，错误代码: {power_result}")
+
+        time.sleep(5)
+        buffer_size = 102400
+        buffer = (c_ubyte * buffer_size)()
+        print("尝试读取数据...")
+
+        
+        # ===================================================
+        # 函数: USB_ReadData
+        # 描述: 从USB设备读取数据
+        # 参数:
+        #   serial_param: 设备序列号
+        #   buffer: 数据缓冲区，用于存储读取到的数据
+        #   buffer_size: 要读取的数据长度(字节)
+        # 返回值:
+        #   >0: 实际读取到的数据长度
+        #   =0: 超时，未读取到数据
+        #   <0: 读取失败，返回错误代码
+        # ===================================================
+
+        read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
+        if read_result > 0:
+            print(f"成功读取 {read_result} 字节数据")
+            
+            # 显示原始十六进制数据样本
+            print("数据样本: ", end="")
+            for i in range(min(read_result, 16)):
+                print(f"{buffer[i]:02X} ", end="")
+            print()
+            
+            # 解析收到的数据为浮点数电流值
+            try:
+                # 将缓冲区转换为字节数组
+                byte_data = bytes(buffer[:read_result])
+                # 将字节转换为字符串
+                str_data = byte_data.decode('ascii')
+                # 按行分割数据
+                current_lines = str_data.strip().split('\r\n')
+                
+                print(f"\n解析的电流值(共{len(current_lines)}个数据点):")
+                for i, line in enumerate(current_lines[:40]):  # 只显示前5个值
+                    if line.strip():  # 跳过空行
+                        try:
+                            current = float(line)
+                            print(f"[电流值 {i}] {current:.6f} uA")
+                        except ValueError:
+                            print(f"[电流值 {i}] 无法解析: {line}")
+                
+
+                
+            except Exception as e:
+                print(f"解析数据时出错: {e}")
+            
+        elif read_result == 0:
+            print("超时，未读取到数据")
+        else:
+            print(f"读取失败，错误代码: {read_result}")
+
+
+
+
+
+
+
+
+
+
+
+        power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
+
+        if power_result == POWER_SUCCESS:
+
+            print(f"停止读取")
+        else:
+            print(f"停止读取，错误代码: {power_result}")
+
+
+
+
+
+
+
+
+
         # ===================================================
         # 函数: USB_CloseDevice
         # 描述: 关闭USB设备连接

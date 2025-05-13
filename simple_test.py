@@ -215,40 +215,7 @@ def main():
         # 等待一下，给设备处理时间
         time.sleep(1)
         
-        print("\n测试电压设置功能...")
-        # 定义电源相关常量
-        POWER_CHANNEL_1 = 0x01
-        POWER_SUCCESS = 0
-        
-        # 设置电压值（比如3.3V = 3300mV）
-        voltage_mv = 3300
-        
-        # ===================================================
-        # 函数: POWER_SetVoltage
-        # 描述: 设置电源电压
-        # 参数:
-        #   serial_param: 设备序列号
-        #   channel: 电源通道
-        #   voltage_mv: 要设置的电压值(mV)
-        # 返回值:
-        #   =0: 成功设置电压
-        #   <0: 设置失败，返回错误代码
-        # ===================================================
-        # 定义 POWER_SetVoltage 函数参数类型
-        usb_application.POWER_SetVoltage.argtypes = [c_char_p, c_ubyte, c_ushort]
-        usb_application.POWER_SetVoltage.restype = c_int
-        
-        # 调用 POWER_SetVoltage 函数设置电压
-        print(f"设置电压: 通道={POWER_CHANNEL_1}, 电压={voltage_mv}mV")
-        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, voltage_mv)
-        
-        if power_result == POWER_SUCCESS:
-            print(f"成功发送设置电压命令，现在可以查看STM32串口输出")
-        else:
-            print(f"设置电压失败，错误代码: {power_result}")
-            
-        # 等待一下，给设备处理时间
-        time.sleep(1)
+
         
         print("\n关闭设备...")
         
