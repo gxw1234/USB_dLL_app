@@ -32,6 +32,13 @@ class SPI_CONFIG(Structure):
         ("SelPolarity", c_char),       # 片选信号极性
         ("ClockSpeedHz", c_uint)       # SPI时钟频率
     ]
+    
+# 定义电压配置结构体
+class VOLTAGE_CONFIG(Structure):
+    _fields_ = [
+        ("channel", c_ubyte),        # 电源通道
+        ("voltage", c_ushort)        # 电压值（单位：mV）
+    ]
 
 def main():
     # 当前目录
@@ -48,13 +55,11 @@ def main():
     # 加载DLL
     usb_application = ctypes.CDLL(dll_path)
     print("成功加载DLL")
-    
     # 启用日志功能（可选）
     print("启用USB调试日志...")
     # 定义函数类型
     # 调用日志开关函数，参数1表示开启
     usb_application.USB_SetLogging(1)
-    
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
@@ -162,6 +167,7 @@ def main():
         #   <0: 初始化失败，返回错误代码
         # ===================================================
         # 定义 SPI_Init 函数参数类型
+
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
@@ -206,6 +212,41 @@ def main():
         else:
             print(f"SPI初始化失败，错误代码: {spi_init_result}")
         
+        # 等待一下，给设备处理时间
+        time.sleep(1)
+        
+        print("\n测试电压设置功能...")
+        # 定义电源相关常量
+        POWER_CHANNEL_1 = 0x01
+        POWER_SUCCESS = 0
+        
+        # 设置电压值（比如3.3V = 3300mV）
+        voltage_mv = 3300
+        
+        # ===================================================
+        # 函数: POWER_SetVoltage
+        # 描述: 设置电源电压
+        # 参数:
+        #   serial_param: 设备序列号
+        #   channel: 电源通道
+        #   voltage_mv: 要设置的电压值(mV)
+        # 返回值:
+        #   =0: 成功设置电压
+        #   <0: 设置失败，返回错误代码
+        # ===================================================
+        # 定义 POWER_SetVoltage 函数参数类型
+        usb_application.POWER_SetVoltage.argtypes = [c_char_p, c_ubyte, c_ushort]
+        usb_application.POWER_SetVoltage.restype = c_int
+        
+        # 调用 POWER_SetVoltage 函数设置电压
+        print(f"设置电压: 通道={POWER_CHANNEL_1}, 电压={voltage_mv}mV")
+        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, voltage_mv)
+        
+        if power_result == POWER_SUCCESS:
+            print(f"成功发送设置电压命令，现在可以查看STM32串口输出")
+        else:
+            print(f"设置电压失败，错误代码: {power_result}")
+            
         # 等待一下，给设备处理时间
         time.sleep(1)
         
