@@ -126,7 +126,7 @@ def main():
         usb_application.POWER_SetVoltage.argtypes = [c_char_p, c_ubyte, c_ushort]
         usb_application.POWER_SetVoltage.restype = c_int
         print(f"设置电压: 通道={POWER_CHANNEL_1}, 电压={voltage_mv}mV")
-        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 224)
+        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 186)
         if power_result == POWER_SUCCESS:
             print(f"成功发送设置电压命令，现在可以查看STM32串口输出")
         else:
