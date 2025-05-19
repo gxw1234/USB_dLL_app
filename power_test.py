@@ -9,7 +9,7 @@ import os
 import ctypes
 import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
-
+import struct
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
@@ -122,7 +122,7 @@ def main():
         else:
             print(f"设置电压失败，错误代码: {power_result}")
         time.sleep(1)
-        print("\n关闭设备...")
+
         power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
         if power_result == POWER_SUCCESS:
             print(f"开始读取")
@@ -151,36 +151,24 @@ def main():
         read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
         if read_result > 0:
             print(f"成功读取 {read_result} 字节数据")
-            
-            # 显示原始十六进制数据样本
-            print("数据样本: ", end="")
-            for i in range(min(read_result, 16)):
-                print(f"{buffer[i]:02X} ", end="")
-            print()
-            
-            # 解析收到的数据为浮点数电流值
-            try:
-                # 将缓冲区转换为字节数组
-                byte_data = bytes(buffer[:read_result])
-                # 将字节转换为字符串
-                str_data = byte_data.decode('ascii')
-                # 按行分割数据
-                current_lines = str_data.strip().split('\r\n')
-                
-                print(f"\n解析的电流值(共{len(current_lines)}个数据点):")
-                for i, line in enumerate(current_lines[:40]):  # 只显示前5个值
-                    if line.strip():  # 跳过空行
-                        try:
-                            current = float(line)
-                            print(f"[电流值 {i}] {current:.6f} uA")
-                        except ValueError:
-                            print(f"[电流值 {i}] 无法解析: {line}")
-                
-
-                
-            except Exception as e:
-                print(f"解析数据时出错: {e}")
-            
+            import struct
+            received_bytes = bytes(buffer[:read_result])
+            data_point_count = read_result // 5
+            print(f"解析到的电流数据:")
+            current_values = []
+            current_types = []
+            for i in range(min(data_point_count, 10)):  
+                try:
+                    base = i * 5 
+                    data_type = received_bytes[base]  
+                    current_value = struct.unpack('f', received_bytes[base+1:base+5])[0]  # 后4个字节是浮点数
+                    current_values.append(current_value)
+                    current_types.append(data_type)
+                    unit = "uA" if data_type == 1 else "mA"  # 1表示微安，0表示毫安
+                    print(f"  电流{i+1}: {current_value:.6f} {unit}")
+                except Exception as e:
+                    print(f"  无法解析第{i+1}个电流值: {str(e)}")
+            print(f"共有{data_point_count}个数据点")
         elif read_result == 0:
             print("超时，未读取到数据")
         else:
@@ -188,27 +176,12 @@ def main():
 
 
 
-
-
-
-
-
-
-
-
         power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
-
         if power_result == POWER_SUCCESS:
 
             print(f"停止读取")
         else:
             print(f"停止读取，错误代码: {power_result}")
-
-
-
-
-
-
 
 
 
@@ -221,7 +194,7 @@ def main():
         #   =0: 设备成功关闭
         #   <0: 关闭失败，返回错误代码
         # ===================================================
-
+        print("\n关闭设备...")
         close_result = usb_application.USB_CloseDevice(serial_param)
         if close_result == 0:
             print("设备关闭成功")
