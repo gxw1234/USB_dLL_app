@@ -13,7 +13,7 @@ extern "C" {
 #include <windows.h>
 
 // 调试开关，0=开启日志，1=关闭日志
-#define USB_DEBUG_ENABLE 1
+#define USB_DEBUG_ENABLE 0
 
 /**
  * @brief 设置日志状态

@@ -4,12 +4,12 @@
 """
 简单的USB应用层测试脚本
 """
-
+from PIL import Image
 import os
 import ctypes
 import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
-
+from ctypes import *
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
@@ -39,6 +39,56 @@ class VOLTAGE_CONFIG(Structure):
         ("channel", c_ubyte),        # 电源通道
         ("voltage", c_ushort)        # 电压值（单位：mV）
     ]
+
+
+
+from numpy import array
+def image_sort(data: list):
+    image_format = "." + data[0].split(".")[1]
+    image_length_length = len(data[0].split(".")[0])
+    Formatting = "%0" + str(image_length_length) + "d"
+    im_split = [int(i.split(".")[0]) for i in data]
+    for i in range(len(im_split)):
+        for j in range(i + 1, (len(im_split))):
+            if im_split[i] > im_split[j]:
+                im_split[i], im_split[j] = im_split[j], im_split[i]
+    return [str(Formatting % i) + image_format for i in im_split]
+
+
+def Process_99_frames(images_data_list=list):
+    temp = []
+    temp1 = []
+    temp2 = []
+    for k, i in enumerate(images_data_list):
+        if k < 80:
+            temp += list(i)
+        elif k < 160:
+            temp1 += list(i)
+        else:
+            temp2 += list(i)
+
+    return temp, temp1, temp2
+
+
+def hex_images(save_path: str) -> list:
+    file_dir = save_path
+    dir_list = os.listdir(file_dir)
+    data_list = []
+
+    data_list_sort = image_sort(dir_list)
+
+    for cur_file in data_list_sort:
+        # 获取文件的绝对路径
+        path = os.path.join(file_dir, cur_file)
+        im = Image.open(path)
+        img = im.convert('L')
+        img_array = array(img)
+        temp, temp1, temp2 = Process_99_frames(img_array)
+        data_list.append([(c_ubyte * len(temp))(*temp), (c_ubyte * len(temp1))(*temp1), (c_ubyte * len(temp2))(*temp2)])
+    return data_list
+
+
+
 
 def main():
     # 当前目录
@@ -112,35 +162,9 @@ def main():
     time.sleep(1)
     if handle >= 0:
         print(f"设备打开成功，句柄: {handle}")
-        # 读取数据
-        buffer_size = 102400
-        buffer = (c_ubyte * buffer_size)()
-        print("尝试读取数据...")
-        # ===================================================
-        # 函数: USB_ReadData
-        # 描述: 从USB设备读取数据
-        # 参数:
-        #   serial_param: 设备序列号
-        #   buffer: 数据缓冲区，用于存储读取到的数据
-        #   buffer_size: 要读取的数据长度(字节)
-        # 返回值:
-        #   >0: 实际读取到的数据长度
-        #   =0: 超时，未读取到数据
-        #   <0: 读取失败，返回错误代码
-        # ===================================================
 
-        read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
-        
-        if read_result > 0:
-            print(f"成功读取 {read_result} 字节数据")
-            print("数据样本: ", end="")
-            for i in range(min(read_result, 16)):
-                print(f"{buffer[i]:02X} ", end="")
-            print()
-        elif read_result == 0:
-            print("超时，未读取到数据")
-        else:
-            print(f"读取失败，错误代码: {read_result}")
+
+
         print("\n测试SPI初始化功能...")
         # 定义SPI相关常量
         SPI1_CS0 = 0
@@ -151,7 +175,7 @@ def main():
         spi_config.Mode = 0              # 硬件控制（全双工模式）
         spi_config.Master = 1          # 主机模式
         spi_config.CPOL = 0           
-        spi_config.CPHA = 0           
+        spi_config.CPHA = 1
         spi_config.LSBFirst = 0        # MSB在前
         spi_config.SelPolarity = 0    
         spi_config.ClockSpeedHz = 25000000  # 25MHz
@@ -172,19 +196,21 @@ def main():
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
             SPIIndex = SPI1_CS0
-            write_buffer_size = 20 * 1024  # 20KB
+
+
+
+
+            write_buffer_size = 1024  # 20KB
             write_buffer = (c_ubyte * write_buffer_size)()
-            
             # 生成测试数据
             for i in range(write_buffer_size):
                 write_buffer[i] = i % 256
-            
-            # 只发送前10个字节进行测试，避免数据过多
-            test_size = 10
-            print(f"发送的前{test_size}个字节数据: ", end="")
-            for i in range(test_size):
-                print(f"{write_buffer[i]:02X} ", end="")
-            print()
+
+            # test_size = 10
+            # print(f"发送的前{test_size}个字节数据: ", end="")
+            # for i in range(test_size):
+            #     print(f"{write_buffer[i]:02X} ", end="")
+            # print()
             
             # ===================================================
             # 函数: SPI_WriteBytes
@@ -201,14 +227,38 @@ def main():
             # 定义SPI_WriteBytes函数参数类型
             usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
             usb_application.SPI_WriteBytes.restype = c_int
-            
+
+            current_line = r"D:\py\autoScan\temp1\1"
+
+            images_data = hex_images(current_line)
+
+            usb_application.GPIO_SetOutput(serial_param, 0, 0)
+
+
+
+            for i in images_data:
+                write_result = usb_application.GPIO_Write(serial_param, 0, 0)
+                for ii in i:
+                    # 直接传递数组，ctypes会自动转换为指针
+                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, ii, len(ii))
+                write_result = usb_application.GPIO_Write(serial_param, 0, 1)
+            #
+            # def Single_frame_sen(self, data):
+            #     USB2XXXLib.GPIO_Write(self.DevHandle, self.pb_cs, 0x00)
+            #     for ii in data:
+            #         USB2XXXLib.SPI_WriteBytes(self.DevHandle, SPI1_CS0, byref(ii), len(ii))
+            #     USB2XXXLib.GPIO_Write(self.DevHandle, self.pb_cs, self.pb_cs)
+
+
             # 调用SPI_WriteBytes函数发送数据
-            write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, test_size)
-            
-            if write_result == SPI_SUCCESS:
-                print(f"成功发送SPI写数据命令，发送了{test_size}字节数据，")
-            else:
-                print(f"发送SPI写数据失败，错误代码: {write_result}")
+            # write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
+
+
+            #
+            # if write_result == SPI_SUCCESS:
+            #     print(f"成功发送SPI写数据命令，发送了{len(write_buffer)}字节数据，")
+            # else:
+            #     print(f"发送SPI写数据失败，错误代码: {write_result}")
         else:
             print(f"SPI初始化失败，错误代码: {spi_init_result}")
         

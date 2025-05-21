@@ -1,6 +1,8 @@
 #ifndef USB_APPLICATION_H
 #define USB_APPLICATION_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,6 +80,26 @@ WINAPI int USB_WriteData(const char* target_serial, unsigned char* data, int len
  * 开启后，USB操作将记录详细日志到usb_debug.log文件
  */
 WINAPI void USB_SetLogging(int enable);
+
+/**
+ * @brief 设置GPIO为输出模式
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param GPIOIndex GPIO索引
+ * @param OutputMask 输出引脚掩码，每个位对应一个引脚，1表示设置为输出
+ * @return int 成功返回0，失败返回错误代码
+ */
+WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t OutputMask);
+
+/**
+ * @brief 写入GPIO输出值
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param GPIOIndex GPIO索引
+ * @param WriteValue 写入的值，每个位对应一个引脚
+ * @return int 成功返回0，失败返回错误代码
+ */
+WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue);
 
 // 错误代码定义
 #define USB_SUCCESS             0    // 成功
