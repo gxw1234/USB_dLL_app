@@ -17,6 +17,7 @@
 #define CMD_READ            0x03    // 读数据命令
 #define CMD_SET_DIR         0x04    // 设置方向命令
 #define CMD_TRANSFER        0x05    // 读写数据命令
+#define CMD_END_MARKER      0xA5A5A5A5 // 命令包结束符
 
 // 通用命令包头结构
 typedef struct _GENERIC_CMD_HEADER {
@@ -25,6 +26,7 @@ typedef struct _GENERIC_CMD_HEADER {
   uint8_t device_index;   // 设备索引
   uint8_t param_count;    // 参数数量
   uint16_t data_len;      // 数据部分长度
+  uint16_t total_packets; // 整包总数
 } GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
 
 // 简化的参数头结构
@@ -89,8 +91,9 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
     cmd_header.param_count = 0;                 // 参数数量：0个
     cmd_header.data_len = 1;                    // 数据部分长度: 1字节掩码
     
-    // 计算总长度：命令头 + 数据
-    int total_len = sizeof(GENERIC_CMD_HEADER) + 1;
+    // 计算总长度：命令头 + 数据 + 结束符
+    int total_len = sizeof(GENERIC_CMD_HEADER) + 1 + sizeof(uint32_t);
+    cmd_header.total_packets = total_len;
     
     // 分配发送缓冲区
     unsigned char* send_buffer = (unsigned char*)malloc(total_len);
@@ -104,6 +107,10 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
     
     // 复制输出掩码
     send_buffer[sizeof(GENERIC_CMD_HEADER)] = OutputMask;
+    
+    // 在数据包末尾添加结束符
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + 1, &end_marker, sizeof(uint32_t));
     
     debug_printf("发送GPIO设置输出命令: protocol=%d, cmd=%d, index=%d, data_len=%d, mask=0x%02X",
                  cmd_header.protocol_type, cmd_header.cmd_id, cmd_header.device_index, 
@@ -153,8 +160,9 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
     cmd_header.param_count = 0;                 // 参数数量：0个
     cmd_header.data_len = 1;                    // 数据部分长度: 1字节数据
     
-    // 计算总长度：命令头 + 数据
-    int total_len = sizeof(GENERIC_CMD_HEADER) + 1;
+    // 计算总长度：命令头 + 数据 + 结束符
+    int total_len = sizeof(GENERIC_CMD_HEADER) + 1 + sizeof(uint32_t);
+    cmd_header.total_packets = total_len;
     
     // 分配发送缓冲区
     unsigned char* send_buffer = (unsigned char*)malloc(total_len);
@@ -168,6 +176,10 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
     
     // 复制GPIO数据
     send_buffer[sizeof(GENERIC_CMD_HEADER)] = WriteValue;
+    
+    // 在数据包末尾添加结束符
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + 1, &end_marker, sizeof(uint32_t));
     
     debug_printf("发送GPIO写命令: protocol=%d, cmd=%d, index=%d, data_len=%d, value=0x%02X",
                  cmd_header.protocol_type, cmd_header.cmd_id, cmd_header.device_index, 

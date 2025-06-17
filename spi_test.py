@@ -70,6 +70,22 @@ def Process_99_frames(images_data_list=list):
     return temp, temp1, temp2
 
 
+def Process_99_frames(images_data_list=list):
+    temp = []
+    temp1 = []
+    temp2 = []
+    for k, i in enumerate(images_data_list):
+        if k < 80:
+            temp += list(i)
+        elif k < 160:
+            temp1 += list(i)
+        else:
+            temp2 += list(i)
+
+    return temp, temp1, temp2
+
+
+
 def hex_images(save_path: str) -> list:
     file_dir = save_path
     dir_list = os.listdir(file_dir)
@@ -83,8 +99,11 @@ def hex_images(save_path: str) -> list:
         im = Image.open(path)
         img = im.convert('L')
         img_array = array(img)
-        temp, temp1, temp2 = Process_99_frames(img_array)
-        data_list.append([(c_ubyte * len(temp))(*temp), (c_ubyte * len(temp1))(*temp1), (c_ubyte * len(temp2))(*temp2)])
+        # 将二维数组展平为一维数组
+        flat_img_array = img_array.flatten()
+        # 直接创建ctypes数组并添加到列表（不再使用外层列表）
+        data_list.append((c_ubyte * len(flat_img_array))(*flat_img_array))
+
     return data_list
 
 
@@ -165,6 +184,8 @@ def main():
 
 
 
+
+
         print("\n测试SPI初始化功能...")
         # 定义SPI相关常量
         SPI1_CS0 = 0
@@ -193,18 +214,17 @@ def main():
         # 定义 SPI_Init 函数参数类型
 
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
+        time.sleep(1)
+
+
+        gpio_index = 0x00
+        output_mask = 0x00  # 只设置第一个引脚为输出
+        # set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, output_mask)
+
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
             SPIIndex = SPI1_CS0
 
-
-
-
-            write_buffer_size = 1024  # 20KB
-            write_buffer = (c_ubyte * write_buffer_size)()
-            # 生成测试数据
-            for i in range(write_buffer_size):
-                write_buffer[i] = i % 256
 
             # test_size = 10
             # print(f"发送的前{test_size}个字节数据: ", end="")
@@ -225,42 +245,48 @@ def main():
             #   <0: 发送失败，返回错误代码
             # ===================================================
             # 定义SPI_WriteBytes函数参数类型
-            usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
-            usb_application.SPI_WriteBytes.restype = c_int
-
-            current_line = r"D:\py\autoScan\temp1\1"
-
-            images_data = hex_images(current_line)
-
-            usb_application.GPIO_SetOutput(serial_param, 0, 0)
+            # usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
+            # usb_application.SPI_WriteBytes.restype = c_int
 
 
+            path = r'D:\py\autoScan\2\0019_img_0019_out'
+            images = hex_images(path)
+            print(f'len:{len(images)}')
+            # usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[0], len(images[0]))
 
-            for i in images_data:
-                write_result = usb_application.GPIO_Write(serial_param, 0, 0)
-                for ii in i:
-                    # 直接传递数组，ctypes会自动转换为指针
-                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, ii, len(ii))
-                write_result = usb_application.GPIO_Write(serial_param, 0, 1)
+            T1 =time.time()
+
+            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
+            time.sleep(0.01)
             #
-            # def Single_frame_sen(self, data):
-            #     USB2XXXLib.GPIO_Write(self.DevHandle, self.pb_cs, 0x00)
-            #     for ii in data:
-            #         USB2XXXLib.SPI_WriteBytes(self.DevHandle, SPI1_CS0, byref(ii), len(ii))
-            #     USB2XXXLib.GPIO_Write(self.DevHandle, self.pb_cs, self.pb_cs)
+            for i in images:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
+
+            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
+            print(f'end_tiem :{time.time() -T1}')
+            time.sleep(0.1)
+            for i in images[:5]:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
 
 
-            # 调用SPI_WriteBytes函数发送数据
+
+            # write_buffer_size = 96*240
+            # write_buffer = (c_ubyte * write_buffer_size)()
+            # for i in range(write_buffer_size):
+            #     write_buffer[i] = i % 256
+            # a =time.time()
+
             # write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
-
-
             #
+            # print(f'temi{time.time()  -a}')
             # if write_result == SPI_SUCCESS:
             #     print(f"成功发送SPI写数据命令，发送了{len(write_buffer)}字节数据，")
             # else:
             #     print(f"发送SPI写数据失败，错误代码: {write_result}")
         else:
-            print(f"SPI初始化失败，错误代码: {spi_init_result}")
+            print(f"SPI初始化失败，错误代码: {1}")
         
         # 等待一下，给设备处理时间
         time.sleep(1)

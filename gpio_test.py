@@ -173,10 +173,7 @@ def main():
         return
     
     # 设置GPIO函数参数类型
-    usb_application.GPIO_SetOutput.argtypes = [c_char_p, c_int, c_ubyte]
-    usb_application.GPIO_SetOutput.restype = c_int
-    usb_application.GPIO_Write.argtypes = [c_char_p, c_int, c_ubyte]
-    usb_application.GPIO_Write.restype = c_int
+
     
     # 设置第一个GPIO引脚为输出模式
     print("\n尝试调用GPIO_SetOutput...")

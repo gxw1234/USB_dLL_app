@@ -74,7 +74,7 @@ def main():
     
     # 连续读取数据
     buffer_size = 40960
-    read_count = 1000  # 固定读取1000次
+    read_count = 2  # 固定读取1000次
     buffer = (ctypes.c_ubyte * buffer_size)()
     
     print(f"\n开始测试: 连续读取 {read_count} 次，每次 {buffer_size} 字节")
