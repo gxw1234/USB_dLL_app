@@ -74,15 +74,12 @@ def main():
     
     # 连续读取数据
     buffer_size = 40960
-    read_count = 2  # 固定读取1000次
+    read_count = 1000  # 固定读取1000次
     buffer = (ctypes.c_ubyte * buffer_size)()
-    
     print(f"\n开始测试: 连续读取 {read_count} 次，每次 {buffer_size} 字节")
-    
     total_bytes = 0
     start_time = time.time()
     errors = 0
-    
     # 记录每100次读取的时间点和字节数，用于计算实时速率
     checkpoints = []
     

@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <process.h>  // 用于线程函数
 
-// 目标设备的VID和PID
+
 #define VENDOR_ID   0xCCDD          // 设备VID
 #define PRODUCT_ID  0xAABB          // 设备PID
 

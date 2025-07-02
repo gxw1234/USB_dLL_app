@@ -191,9 +191,9 @@ def main():
             print(f"GPIO写入成功: 0x{led_value:02X} (只点亮第一个LED)")
         else:
             print(f"GPIO写入失败，错误代码: {write_result}")
-
         time.sleep(5)
         write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
+
 
 
     else:

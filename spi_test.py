@@ -166,7 +166,10 @@ def main():
 
     print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
     serial_param = devices[0].serial    #打开第一个设备
-    
+
+
+
+
     # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     # ===================================================
     # 函数: USB_OpenDevice
@@ -213,8 +216,8 @@ def main():
         # ===================================================
         # 定义 SPI_Init 函数参数类型
 
-        spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
-        time.sleep(1)
+        # spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
+        # time.sleep(1)
 
 
         gpio_index = 0x00
@@ -222,7 +225,7 @@ def main():
         # set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, output_mask)
 
         if spi_init_result == SPI_SUCCESS:
-            print("成功发送SPI初始化命令，现在可以查看STM32串口输出")
+            print("成功发送SPI初始化命令")
             SPIIndex = SPI1_CS0
 
 
@@ -249,27 +252,42 @@ def main():
             # usb_application.SPI_WriteBytes.restype = c_int
 
 
+            # print(f'断电')
+            # usb_application.GPIO_Write(serial_param, 9, 0)  #P9 拉高断电
+            # time.sleep(2)
+            # print(f'上电')
+            # usb_application.GPIO_Write(serial_param, 9, 1)   #P9 拉底上电
+            # time.sleep(5)
+
             path = r'D:\py\autoScan\2\0019_img_0019_out'
             images = hex_images(path)
             print(f'len:{len(images)}')
             # usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[0], len(images[0]))
 
-            T1 =time.time()
 
-            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
-            time.sleep(0.01)
+            # for  i in range(10):
             #
-            for i in images:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
-
-            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
-            print(f'end_tiem :{time.time() -T1}')
-            time.sleep(0.1)
-            for i in images[:5]:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
-
+            #     print(f'断电')
+            #     usb_application.GPIO_Write(serial_param, 9, 0)  #P9 拉高断电
+            #     time.sleep(2)
+            #     print(f'上电')
+            #     usb_application.GPIO_Write(serial_param, 9, 1)   #P9 拉底上电
+            #     time.sleep(5)
+            #
+            #     T1 =time.time()
+            #     write_result = usb_application.GPIO_Write(serial_param, 5, 0)  #下压
+            #     time.sleep(0.1)
+            #     for i in images:
+            #         usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+            #         time.sleep(0.007)
+            #     write_result = usb_application.GPIO_Write(serial_param, 5, 1)  # 抬起
+            #     write_result = usb_application.GPIO_Write(serial_param, 5, 1)  # 抬起
+            #     print(f'end_tiem :{time.time() -T1}')
+                # time.sleep(0.1)
+                # for i in images[:8]:
+                #     usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                #     time.sleep(0.007)
+                # time.sleep(5)
 
 
             # write_buffer_size = 96*240
@@ -277,7 +295,6 @@ def main():
             # for i in range(write_buffer_size):
             #     write_buffer[i] = i % 256
             # a =time.time()
-
             # write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
             #
             # print(f'temi{time.time()  -a}')

@@ -147,10 +147,7 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
         return GPIO_ERR_PARAM_INVALID;
     }
     
-    if (GPIOIndex < GPIO_PORT0 || GPIOIndex > GPIO_PORT2) {
-        debug_printf("GPIO索引无效: %d", GPIOIndex);
-        return GPIO_ERR_PARAM_INVALID;
-    }
+
     
     // 创建通用命令包头
     GENERIC_CMD_HEADER cmd_header;
