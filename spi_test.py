@@ -13,12 +13,12 @@ from ctypes import *
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
-        ("serial", c_char * 64),       # 设备序列号
-        ("vendor_id", c_ushort),       # 厂商ID
-        ("product_id", c_ushort),      # 产品ID
-        ("description", c_char * 256), # 设备描述
-        ("manufacturer", c_char * 256),# 制造商
-        ("interface_str", c_char * 256)# 接口
+        ("serial", c_char * 64),
+        ("description", c_char * 128),
+        ("manufacturer", c_char * 128),
+        ("vendor_id", c_ushort),
+        ("product_id", c_ushort),
+        ("device_id", c_int)
     ]
 
 # 定义SPI配置结构体
@@ -145,7 +145,7 @@ def main():
     #   >=0: 实际扫描到的设备数量
     #   <0: 发生错误，返回错误代码
     # ===================================================
-    result = usb_application.USB_ScanDevice(ctypes.byref(devices), max_devices)
+    result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
 
     print(f"扫描结果: {result}")
     if result > 0:
@@ -216,7 +216,7 @@ def main():
         # ===================================================
         # 定义 SPI_Init 函数参数类型
 
-        # spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
+        spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
         # time.sleep(1)
 
 
@@ -261,7 +261,7 @@ def main():
 
             path = r'D:\py\autoScan\2\0019_img_0019_out'
             images = hex_images(path)
-            print(f'len:{len(images)}')
+
             # usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[0], len(images[0]))
 
 
@@ -290,18 +290,18 @@ def main():
                 # time.sleep(5)
 
 
-            # write_buffer_size = 96*240
-            # write_buffer = (c_ubyte * write_buffer_size)()
-            # for i in range(write_buffer_size):
-            #     write_buffer[i] = i % 256
-            # a =time.time()
-            # write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
-            #
-            # print(f'temi{time.time()  -a}')
-            # if write_result == SPI_SUCCESS:
-            #     print(f"成功发送SPI写数据命令，发送了{len(write_buffer)}字节数据，")
-            # else:
-            #     print(f"发送SPI写数据失败，错误代码: {write_result}")
+            write_buffer_size = 10
+            write_buffer = (c_ubyte * write_buffer_size)()
+            for i in range(write_buffer_size):
+                write_buffer[i] = i % 256
+            a =time.time()
+            write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
+
+            print(f'temi{time.time()  -a}')
+            if write_result == SPI_SUCCESS:
+                print(f"成功发送SPI写数据命令，发送了{len(write_buffer)}字节数据，")
+            else:
+                print(f"发送SPI写数据失败，错误代码: {write_result}")
         else:
             print(f"SPI初始化失败，错误代码: {1}")
         

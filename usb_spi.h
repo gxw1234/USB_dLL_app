@@ -16,7 +16,7 @@ extern "C" {
 #define SPI2_CS2    5
 
 // 定义返回值
-#define SPI_SUCCESS             0    // 成功
+#define SPI_SUCCESS             0    // 成功SPI_SUCCESS
 #define SPI_ERROR_NOT_FOUND    -1    // 设备未找到
 #define SPI_ERROR_ACCESS       -2    // 访问被拒绝
 #define SPI_ERROR_IO           -3    // I/O错误
@@ -34,11 +34,7 @@ typedef struct _SPI_CONFIG {
     unsigned int ClockSpeedHz;    // SPI时钟频率:单位为HZ，硬件模式下最大50000000，最小390625，频率按2的倍数改变  
 } SPI_CONFIG, *PSPI_CONFIG;
 
-// USB命令协议定义
-#define CMD_SPI_INIT        0x01    // SPI初始化命令
-#define CMD_SPI_WRITE       0x02    // SPI写数据命令
-#define CMD_SPI_READ        0x03    // SPI读数据命令
-#define CMD_SPI_TRANSFER    0x04    // SPI读写数据命令
+
 
 // 命令包头结构
 typedef struct _CMD_HEADER {

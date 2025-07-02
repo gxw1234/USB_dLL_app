@@ -14,12 +14,12 @@ from ctypes import *
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
-        ("serial", c_char * 64),       # 设备序列号
-        ("vendor_id", c_ushort),       # 厂商ID
-        ("product_id", c_ushort),      # 产品ID
-        ("description", c_char * 256), # 设备描述
-        ("manufacturer", c_char * 256),# 制造商
-        ("interface_str", c_char * 256)# 接口
+        ("serial", c_char * 64),
+        ("description", c_char * 128),
+        ("manufacturer", c_char * 128),
+        ("vendor_id", c_ushort),
+        ("product_id", c_ushort),
+        ("device_id", c_int)
     ]
 
 # 定义GPIO端口
@@ -73,7 +73,7 @@ def main():
     #   >=0: 实际扫描到的设备数量
     #   <0: 发生错误，返回错误代码
     # ===================================================
-    result = usb_application.USB_ScanDevice(ctypes.byref(devices), max_devices)
+    result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
     
     if result < 0:
         print(f"扫描设备失败，错误代码: {result}")
@@ -95,7 +95,7 @@ def main():
         print(f"  产品ID: 0x{device.product_id:04X}")
         print(f"  描述: {device.description.decode('utf-8')}")
         print(f"  制造商: {device.manufacturer.decode('utf-8')}")
-        print(f"  接口: {device.interface_str.decode('utf-8')}")
+
     
     # 选择第一个设备
     selected_device = 0

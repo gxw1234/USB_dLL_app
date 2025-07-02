@@ -1,23 +1,10 @@
 #include "usb_gpio.h"
 #include "usb_device.h"
-#include "usb_application.h"
+#include "usb_middleware.h"
+#include "usb_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// 协议类型和命令ID定义（应与STM32端保持一致）
-#define PROTOCOL_SPI        0x01    // SPI协议
-#define PROTOCOL_IIC        0x02    // IIC协议
-#define PROTOCOL_UART       0x03    // UART协议
-#define PROTOCOL_GPIO       0x04    // GPIO协议
-
-// 通用命令ID定义
-#define CMD_INIT            0x01    // 初始化命令
-#define CMD_WRITE           0x02    // 写数据命令
-#define CMD_READ            0x03    // 读数据命令
-#define CMD_SET_DIR         0x04    // 设置方向命令
-#define CMD_TRANSFER        0x05    // 读写数据命令
-#define CMD_END_MARKER      0xA5A5A5A5 // 命令包结束符
 
 // 通用命令包头结构
 typedef struct _GENERIC_CMD_HEADER {
@@ -62,137 +49,99 @@ static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t le
     return pos;
 }
 
-/**
- * @brief 设置GPIO为输出模式
- * 
- * @param target_serial 目标设备的序列号
- * @param GPIOIndex GPIO索引
- * @param OutputMask 输出引脚掩码，每个位对应一个引脚，1表示设置为输出
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t OutputMask) {
-    // 验证参数
     debug_printf("GPIO_SetOutput开始执行");
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
-        return GPIO_ERR_PARAM_INVALID;
+        return USB_ERROR_INVALID_PARAM;
     }
     
-    if (GPIOIndex < GPIO_PORT0 || GPIOIndex > GPIO_PORT2) {
-        debug_printf("GPIO索引无效: %d", GPIOIndex);
-        return GPIO_ERR_PARAM_INVALID;
+
+    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
     }
     
-    // 创建通用命令包头
+    // 组包协议头和数据（与SPI一致）
     GENERIC_CMD_HEADER cmd_header;
-    cmd_header.protocol_type = PROTOCOL_GPIO;     // GPIO协议
-    cmd_header.cmd_id = CMD_SET_DIR;            // 设置方向命令
-    cmd_header.device_index = (uint8_t)GPIOIndex; // 设备索引
-    cmd_header.param_count = 0;                 // 参数数量：0个
-    cmd_header.data_len = 1;                    // 数据部分长度: 1字节掩码
-    
-    // 计算总长度：命令头 + 数据 + 结束符
-    int total_len = sizeof(GENERIC_CMD_HEADER) + 1 + sizeof(uint32_t);
-    cmd_header.total_packets = total_len;
-    
-    // 分配发送缓冲区
+    cmd_header.protocol_type = PROTOCOL_GPIO;
+    cmd_header.cmd_id = CMD_SET_DIR;
+    cmd_header.device_index = (uint8_t)GPIOIndex;
+    cmd_header.param_count = 1;
+    cmd_header.data_len = 0; // 数据部分长度为0，参数通过参数区传递
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
     unsigned char* send_buffer = (unsigned char*)malloc(total_len);
     if (!send_buffer) {
         debug_printf("内存分配失败");
-        return GPIO_ERR_OTHER;
+        return USB_ERROR_OTHER;
     }
-    
-    // 复制命令头到缓冲区
     memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
-    
-    // 复制输出掩码
-    send_buffer[sizeof(GENERIC_CMD_HEADER)] = OutputMask;
-    
-    // 在数据包末尾添加结束符
+    int pos = sizeof(GENERIC_CMD_HEADER);
+    // 添加参数头和参数体
+    PARAM_HEADER param_header;
+    param_header.param_len = sizeof(uint8_t);
+    memcpy(send_buffer + pos, &param_header, sizeof(PARAM_HEADER));
+    pos += sizeof(PARAM_HEADER);
+    memcpy(send_buffer + pos, &OutputMask, sizeof(uint8_t));
+    pos += sizeof(uint8_t);
+    // 添加帧尾
     uint32_t end_marker = CMD_END_MARKER;
-    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + 1, &end_marker, sizeof(uint32_t));
-    
-    debug_printf("发送GPIO设置输出命令: protocol=%d, cmd=%d, index=%d, data_len=%d, mask=0x%02X",
-                 cmd_header.protocol_type, cmd_header.cmd_id, cmd_header.device_index, 
-                 cmd_header.data_len, OutputMask);
-    
-    // 使用USB_WriteData发送数据
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
-    
-    // 释放缓冲区
+    memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     
-    if (ret < 0) {
-        debug_printf("发送GPIO设置输出命令失败: 错误代码=%d", ret);
-        return GPIO_ERR_USB_WRITE_FAIL;
-    }
-    
-    debug_printf("成功发送GPIO设置输出命令，GPIO索引: %d, 掩码: 0x%02X", GPIOIndex, OutputMask);
-    return GPIO_SUCCESS;
+    debug_printf("GPIO设置输出结果: %d", ret);
+    return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }
 
-/**
- * @brief 写入GPIO输出值
- * 
- * @param target_serial 目标设备的序列号
- * @param GPIOIndex GPIO索引
- * @param WriteValue 写入的值，每个位对应一个引脚
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue) {
-    // 验证参数
     debug_printf("GPIO_Write开始执行");
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
-        return GPIO_ERR_PARAM_INVALID;
+        return USB_ERROR_INVALID_PARAM;
     }
-    
 
     
-    // 创建通用命令包头
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
+    }
+    
+    // 组包协议头和数据（与SPI一致）
     GENERIC_CMD_HEADER cmd_header;
-    cmd_header.protocol_type = PROTOCOL_GPIO;     // GPIO协议
-    cmd_header.cmd_id = CMD_WRITE;              // 写数据命令
-    cmd_header.device_index = (uint8_t)GPIOIndex; // 设备索引
-    cmd_header.param_count = 0;                 // 参数数量：0个
-    cmd_header.data_len = 1;                    // 数据部分长度: 1字节数据
-    
-    // 计算总长度：命令头 + 数据 + 结束符
-    int total_len = sizeof(GENERIC_CMD_HEADER) + 1 + sizeof(uint32_t);
-    cmd_header.total_packets = total_len;
-    
-    // 分配发送缓冲区
+    cmd_header.protocol_type = PROTOCOL_GPIO;
+    cmd_header.cmd_id = CMD_WRITE;
+    cmd_header.device_index = (uint8_t)GPIOIndex;
+    cmd_header.param_count = 1;
+    cmd_header.data_len = 0; // 数据部分长度为0，参数通过参数区传递
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
     unsigned char* send_buffer = (unsigned char*)malloc(total_len);
     if (!send_buffer) {
         debug_printf("内存分配失败");
-        return GPIO_ERR_OTHER;
+        return USB_ERROR_OTHER;
     }
-    
-    // 复制命令头到缓冲区
     memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
-    
-    // 复制GPIO数据
-    send_buffer[sizeof(GENERIC_CMD_HEADER)] = WriteValue;
-    
-    // 在数据包末尾添加结束符
+    int pos = sizeof(GENERIC_CMD_HEADER);
+    // 添加参数头和参数体
+    PARAM_HEADER param_header;
+    param_header.param_len = sizeof(uint8_t);
+    memcpy(send_buffer + pos, &param_header, sizeof(PARAM_HEADER));
+    pos += sizeof(PARAM_HEADER);
+    memcpy(send_buffer + pos, &WriteValue, sizeof(uint8_t));
+    pos += sizeof(uint8_t);
+    // 添加帧尾
     uint32_t end_marker = CMD_END_MARKER;
-    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + 1, &end_marker, sizeof(uint32_t));
-    
-    debug_printf("发送GPIO写命令: protocol=%d, cmd=%d, index=%d, data_len=%d, value=0x%02X",
-                 cmd_header.protocol_type, cmd_header.cmd_id, cmd_header.device_index, 
-                 cmd_header.data_len, WriteValue);
-    
-    // 使用USB_WriteData发送数据
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
-    
-    // 释放缓冲区
+    memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     
-    if (ret < 0) {
-        debug_printf("发送GPIO写数据命令失败: 错误代码=%d", ret);
-        return GPIO_ERR_USB_WRITE_FAIL;
-    }
-    
-    debug_printf("成功发送GPIO写数据命令，GPIO索引: %d, 数据: 0x%02X", GPIOIndex, WriteValue);
-    return GPIO_SUCCESS;
+    debug_printf("GPIO写入结果: %d", ret);
+    return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }

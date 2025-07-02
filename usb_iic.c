@@ -1,6 +1,7 @@
 #include "usb_iic.h"
 #include "usb_device.h"
-#include "usb_application.h"
+#include "usb_middleware.h"
+#include "usb_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,15 +57,15 @@ static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t le
 /**
  * @brief 初始化IIC
  * 
- * @param target_serial 目标设备的序列号
+ * @param device_id 设备ID
  * @param IICIndex IIC索引
  * @param pConfig IIC配置结构体
  * @return int 成功返回0，失败返回错误代码
  */
-WINAPI int IIC_Init(const char* target_serial, int IICIndex, PIIC_CONFIG pConfig) {
+WINAPI int IIC_Init(int device_id, int IICIndex, PIIC_CONFIG pConfig) {
     // 验证参数
-    if (!target_serial || !pConfig) {
-        debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);
+    if (!pConfig) {
+        debug_printf("参数无效: pConfig=%p", pConfig);
         return IIC_ERROR_INVALID_PARAM;
     }
     
@@ -72,6 +73,7 @@ WINAPI int IIC_Init(const char* target_serial, int IICIndex, PIIC_CONFIG pConfig
         debug_printf("IIC索引无效: %d", IICIndex);
         return IIC_ERROR_INVALID_PARAM;
     }
+    
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_IIC;     // IIC协议
     cmd_header.cmd_id = CMD_INIT;               // 初始化命令
@@ -90,7 +92,7 @@ WINAPI int IIC_Init(const char* target_serial, int IICIndex, PIIC_CONFIG pConfig
     int pos = sizeof(GENERIC_CMD_HEADER);
     pos = Add_Parameter(send_buffer, pos, pConfig, sizeof(IIC_CONFIG));
     
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     
     if (ret < 0) {
@@ -105,18 +107,18 @@ WINAPI int IIC_Init(const char* target_serial, int IICIndex, PIIC_CONFIG pConfig
 /**
  * @brief IIC从机写数据
  * 
- * @param DevHandle 设备句柄
+ * @param device_id 设备ID
  * @param IICIndex IIC索引
  * @param pWriteData 要发送的数据缓冲区
  * @param WriteLen 要发送的数据长度
  * @param TimeOutMs 超时时间(毫秒)
  * @return int 成功返回0，失败返回错误代码
  */
-WINAPI int IIC_SlaveWriteBytes(const char* target_serial, int IICIndex, unsigned char *pWriteData, int WriteLen, int TimeOutMs) {
+WINAPI int IIC_SlaveWriteBytes(int device_id, int IICIndex, unsigned char *pWriteData, int WriteLen, int TimeOutMs) {
     // 验证参数
-    if (!target_serial || !pWriteData || WriteLen <= 0 || TimeOutMs < 0) {
-        debug_printf("参数无效: target_serial=%p, pWriteData=%p, WriteLen=%d, TimeOutMs=%d", 
-                    target_serial, pWriteData, WriteLen, TimeOutMs);
+    if (!pWriteData || WriteLen <= 0 || TimeOutMs < 0) {
+        debug_printf("参数无效: pWriteData=%p, WriteLen=%d, TimeOutMs=%d", 
+                    pWriteData, WriteLen, TimeOutMs);
         return IIC_ERROR_INVALID_PARAM;
     }
     
@@ -140,16 +142,19 @@ WINAPI int IIC_SlaveWriteBytes(const char* target_serial, int IICIndex, unsigned
     }
     
     memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
-
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), pWriteData, WriteLen);
-    debug_printf("IIC_SlaveWriteBytes: target_serial=%s, IICIndex=%d, WriteLen=%d, TimeOutMs=%d", 
-               target_serial, IICIndex, WriteLen, TimeOutMs);
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
+    
+    debug_printf("IIC_SlaveWriteBytes: device_id=%d, IICIndex=%d, WriteLen=%d, TimeOutMs=%d", 
+               device_id, IICIndex, WriteLen, TimeOutMs);
+    
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
+    
     if (ret < 0) {
         debug_printf("发送IIC从机写数据命令失败: %d", ret);
         return IIC_ERROR_IO;
     }
+    
     debug_printf("成功发送IIC从机写数据命令，IIC索引: %d, 数据长度: %d字节, 超时: %dms", 
                 IICIndex, WriteLen, TimeOutMs);
     return IIC_SUCCESS;

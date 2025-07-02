@@ -35,11 +35,10 @@ typedef struct _IIC_CONFIG {
 #endif
 
 // IIC初始化
-WINAPI int IIC_Init(const char* target_serial, int IICIndex, PIIC_CONFIG pConfig);
+WINAPI int IIC_Init(int device_id, int IICIndex, PIIC_CONFIG pConfig);
 
 // IIC从机写数据
-WINAPI int IIC_SlaveWriteBytes(const char* target_serial, int IICIndex, unsigned char *pWriteData, int WriteLen, int TimeOutMs);
-
+WINAPI int IIC_SlaveWriteBytes(int device_id, int IICIndex, unsigned char *pWriteData, int WriteLen, int TimeOutMs);
 
 #ifdef __cplusplus
 }

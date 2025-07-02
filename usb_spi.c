@@ -1,21 +1,10 @@
 #include "usb_spi.h"
 #include "usb_device.h"
+#include "usb_middleware.h"
+#include "usb_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// 协议类型和命令ID定义（应与STM32端保持一致）
-#define PROTOCOL_SPI        0x01    // SPI协议
-#define PROTOCOL_IIC        0x02    // IIC协议
-#define PROTOCOL_UART       0x03    // UART协议
-#define PROTOCOL_GPIO       0x04    // GPIO协议
-
-// 通用命令ID定义
-#define CMD_INIT            0x01    // 初始化命令
-#define CMD_WRITE           0x02    // 写数据命令
-#define CMD_READ            0x03    // 读数据命令
-#define CMD_TRANSFER        0x04    // 读写数据命令
-#define CMD_END_MARKER      0xA5A5A5A5 // 命令包结束符
 
 // 通用命令包头结构 (已移除end_marker字段)
 typedef struct _GENERIC_CMD_HEADER {
@@ -68,19 +57,21 @@ static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t le
  * @param pConfig SPI配置结构体
  * @return int 成功返回0，失败返回错误代码
  */
-WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
-    // 验证参数
+int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
     if (!target_serial || !pConfig) {
         debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);
         return SPI_ERROR_INVALID_PARAM;
     }
-    
     if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
         debug_printf("SPI索引无效: %d", SPIIndex);
         return SPI_ERROR_INVALID_PARAM;
     }
-    
-
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+    // 组包协议头和数据
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_INIT;               // 初始化命令
@@ -108,15 +99,12 @@ WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig
     // 在数据包末尾添加结束符
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
-
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    
     if (ret < 0) {
         debug_printf("发送SPI初始化命令失败: %d", ret);
         return SPI_ERROR_IO;
     }
-    
     debug_printf("成功发送SPI初始化命令，SPI索引: %d", SPIIndex);
     return SPI_SUCCESS;
 }
@@ -130,18 +118,21 @@ WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig
  * @param WriteLen 要发送的数据长度
  * @return int 成功返回0，失败返回错误代码
  */
-WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen) {
-    // 验证参数
+int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen) {
     if (!target_serial || !pWriteBuffer || WriteLen <= 0) {
         debug_printf("参数无效: target_serial=%p, pWriteBuffer=%p, WriteLen=%d", target_serial, pWriteBuffer, WriteLen);
         return SPI_ERROR_INVALID_PARAM;
     }
-    
     if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
         debug_printf("SPI索引无效: %d", SPIIndex);
         return SPI_ERROR_INVALID_PARAM;
     }
-    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+    // 组包协议头和数据
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;    // SPI协议
     cmd_header.cmd_id = CMD_WRITE;             // 写数据命令
@@ -149,7 +140,6 @@ WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char
     cmd_header.param_count = 0;                // 参数数量，写操作不需要额外参数
     cmd_header.data_len = WriteLen;            // 数据部分长度
     cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + WriteLen + sizeof(uint32_t);  // 总大小，包含结束符
-    
 
     // 计算总长度，包含命令头 + 数据 + 结束符
     int total_len = sizeof(GENERIC_CMD_HEADER) + WriteLen + sizeof(uint32_t);
@@ -163,16 +153,12 @@ WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), pWriteBuffer, WriteLen);
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + WriteLen, &end_marker, sizeof(uint32_t));
-    int ret = USB_WriteData(target_serial, send_buffer, total_len);
-    
-    // 释放缓冲区
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    
     if (ret < 0) {
         debug_printf("发送SPI写数据命令失败: %d", ret);
         return SPI_ERROR_IO;
     }
-    
     debug_printf("成功发送SPI写数据命令，SPI索引: %d, 数据长度: %d字节", SPIIndex, WriteLen);
     return SPI_SUCCESS;
 }

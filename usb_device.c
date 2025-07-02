@@ -214,9 +214,20 @@ int usb_device_release_interface(void* handle, int interface_number) {
 // 批量传输
 int usb_device_bulk_transfer(void* handle, unsigned char endpoint, unsigned char* data, int length, int* transferred, unsigned int timeout) {
     if (!g_is_initialized || !handle || !data || length <= 0 || !transferred) {
+        debug_printf("批量传输失败: 参数无效");
         return -1;
     }
+    
+    // debug_printf("开始USB批量传输: endpoint=0x%02X, length=%d, timeout=%dms", endpoint, length, timeout);
+    
     int ret = p_libusb_bulk_transfer(handle, endpoint, data, length, transferred, timeout);
+    
+    // if (ret == 0) {
+    //     debug_printf("USB批量传输成功: 实际传输 %d 字节", *transferred);
+    // } else {
+    //     debug_printf("USB批量传输失败: 错误码=%d", ret);
+    // }
+    
     return ret;
 }
 

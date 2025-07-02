@@ -133,7 +133,7 @@ def main():
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
-
+    usb_application.USB_SetLogging(1)
     print("调用 USB_ScanDevice 函数...")
 
     # ===================================================
@@ -146,7 +146,7 @@ def main():
     #   >=0: 实际扫描到的设备数量
     #   <0: 发生错误，返回错误代码
     # ===================================================
-    result = usb_application.USB_ScanDevice(ctypes.byref(devices), max_devices)
+    result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
 
     print(f"扫描结果: {result}")
     if result > 0:
@@ -183,9 +183,6 @@ def main():
     if handle >= 0:
         print(f"设备打开成功，句柄: {handle}")
 
-        print("\n测试SPI初始化功能...")
-        # 定义SPI相关常量
-        SPI1_CS0 = 0
 
         time.sleep(10)
 
