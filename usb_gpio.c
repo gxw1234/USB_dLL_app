@@ -34,15 +34,10 @@ extern void debug_printf(const char *format, ...);
  * @return int 添加后的位置
  */
 static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t len) {
-    // 添加参数头
     PARAM_HEADER header;
     header.param_len = len;
-    
-    // 复制参数头
     memcpy(buffer + pos, &header, sizeof(PARAM_HEADER));
     pos += sizeof(PARAM_HEADER);
-    
-    // 复制参数数据
     memcpy(buffer + pos, data, len);
     pos += len;
     
@@ -65,7 +60,7 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
         return USB_ERROR_OTHER;
     }
     
-    // 组包协议头和数据（与SPI一致）
+    // 组包协议头和数据（使用通用参数格式）
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_GPIO;
     cmd_header.cmd_id = CMD_SET_DIR;
@@ -88,7 +83,6 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
     pos += sizeof(PARAM_HEADER);
     memcpy(send_buffer + pos, &OutputMask, sizeof(uint8_t));
     pos += sizeof(uint8_t);
-    // 添加帧尾
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
@@ -113,7 +107,7 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
         return USB_ERROR_OTHER;
     }
     
-    // 组包协议头和数据（与SPI一致）
+    // 组包协议头和数据（使用通用参数格式）
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_GPIO;
     cmd_header.cmd_id = CMD_WRITE;
@@ -136,12 +130,11 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
     pos += sizeof(PARAM_HEADER);
     memcpy(send_buffer + pos, &WriteValue, sizeof(uint8_t));
     pos += sizeof(uint8_t);
-    // 添加帧尾
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    
-    debug_printf("GPIO写入结果: %d", ret);
+    // debug_printf("GPIO_Write开始执行, index=%d, value=0x%02X", GPIOIndex, WriteValue);
+    debug_printf("--GPIO写入结果: %d", ret);
     return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }

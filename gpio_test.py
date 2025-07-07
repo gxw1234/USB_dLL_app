@@ -23,7 +23,7 @@ class DeviceInfo(Structure):
     ]
 
 # 定义GPIO端口
-GPIO_PORT0 = 0x00    # GPIO端口0 (对应STM32的PH7引脚)
+GPIO_PORT0 = 0x06    # GPIO端口0 (对应STM32的PH7引脚)
 GPIO_PORT1 = 0x01    # GPIO端口1
 GPIO_PORT2 = 0x02    # GPIO端口2
 
@@ -146,7 +146,7 @@ def main():
     
     # 测试USB通信是否正常工作
     print("\n测试USB调试日志是否工作...")
-    usb_application.USB_SetLogging(1)  # 显式开启日志
+    usb_application.USB_SetLogging(0)  # 显式开启日志
     print("USB调试日志已开启\n")
     
     # 检查Device句柄是否有效
@@ -161,9 +161,10 @@ def main():
     #   =0: 设备成功打开
     #   <0: 打开失败，返回错误代码
     # ==================================================
+
+
     usb_application.USB_OpenDevice.argtypes = [c_char_p]
     usb_application.USB_OpenDevice.restype = c_int
-    
     print("\n打开设备...")
     open_result = usb_application.USB_OpenDevice(serial_param)
     if open_result == 0:
@@ -171,38 +172,37 @@ def main():
     else:
         print(f"设备打开失败，错误代码: {open_result}")
         return
-    
-    # 设置GPIO函数参数类型
 
-    
+
+
+    # 设置GPIO函数参数类型
     # 设置第一个GPIO引脚为输出模式
     print("\n尝试调用GPIO_SetOutput...")
     output_mask = 0x01  # 只设置第一个引脚为输出
     set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, output_mask)
     print(f"GPIO_SetOutput返回值: {set_output_result}\n")
-    
     if set_output_result == GPIO_SUCCESS:
         print(f"成功设置GPIO端口{gpio_index}的第一个引脚为输出模式")
-        
-        # 简单测试 - 只拉高一个引脚
-        led_value = 0x01  # 只点亮第一个LED
-        write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
-        if write_result == GPIO_SUCCESS:
-            print(f"GPIO写入成功: 0x{led_value:02X} (只点亮第一个LED)")
-        else:
-            print(f"GPIO写入失败，错误代码: {write_result}")
-        time.sleep(5)
-        write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
-
+        for i in range(10):
+            # 简单测试 - 只拉高一个引脚
+            led_value = 0x01  # 只点亮第一个LED
+            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
+            if write_result == GPIO_SUCCESS:
+                print(f"GPIO写入成功: 0x{led_value:02X} (只点亮第一个LED)")
+            else:
+                print(f"GPIO写入失败，错误代码: {write_result}")
+            time.sleep(1)
+            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
+            time.sleep(1)
 
 
     else:
         print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
     
-    # 关闭所有LED
-    usb_application.GPIO_Write(serial_param, gpio_index, 1)
+
+
     
-    print("\n关闭设备...")
+    # print("\n关闭设备...")
     
     # ===================================================
     # 函数: USB_CloseDevice

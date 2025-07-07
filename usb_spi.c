@@ -16,12 +16,10 @@ typedef struct _GENERIC_CMD_HEADER {
   uint16_t total_packets; // 整包总数
 } GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
 
-// 简化的参数头结构
 typedef struct _PARAM_HEADER {
   uint16_t param_len;     // 参数长度
 } PARAM_HEADER, *PPARAM_HEADER;
 
-// 内部辅助函数声明
 extern void debug_printf(const char *format, ...);
 
 /**
@@ -34,15 +32,10 @@ extern void debug_printf(const char *format, ...);
  * @return int 添加后的位置
  */
 static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t len) {
-    // 添加参数头
     PARAM_HEADER header;
     header.param_len = len;
-    
-    // 复制参数头
     memcpy(buffer + pos, &header, sizeof(PARAM_HEADER));
     pos += sizeof(PARAM_HEADER);
-    
-    // 复制参数数据
     memcpy(buffer + pos, data, len);
     pos += len;
     
@@ -89,14 +82,10 @@ int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
         return SPI_ERROR_OTHER;
     }
     
-    // 复制命令头
     memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
     int pos = sizeof(GENERIC_CMD_HEADER);
-    
-    // 添加参数
     pos = Add_Parameter(send_buffer, pos, pConfig, sizeof(SPI_CONFIG));
     
-    // 在数据包末尾添加结束符
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
@@ -140,25 +129,31 @@ int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWrit
     cmd_header.param_count = 0;                // 参数数量，写操作不需要额外参数
     cmd_header.data_len = WriteLen;            // 数据部分长度
     cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + WriteLen + sizeof(uint32_t);  // 总大小，包含结束符
-
-    // 计算总长度，包含命令头 + 数据 + 结束符
     int total_len = sizeof(GENERIC_CMD_HEADER) + WriteLen + sizeof(uint32_t);
     unsigned char* send_buffer = (unsigned char*)malloc(total_len);
     if (!send_buffer) {
         debug_printf("内存分配失败");
         return SPI_ERROR_OTHER;
     }
-    
     memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), pWriteBuffer, WriteLen);
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + WriteLen, &end_marker, sizeof(uint32_t));
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+
+//   for (size_t i = 0; i < 20; i++) {
+//         debug_printf("%02X ", (unsigned char)send_buffer[i]);
+//     }
+
+//      debug_printf("-----end-----");
+
+
+
     free(send_buffer);
-    if (ret < 0) {
-        debug_printf("发送SPI写数据命令失败: %d", ret);
-        return SPI_ERROR_IO;
-    }
-    debug_printf("成功发送SPI写数据命令，SPI索引: %d, 数据长度: %d字节", SPIIndex, WriteLen);
+    // if (ret < 0) {
+    //     debug_printf("发送SPI写数据命令失败: %d", ret);
+    //     return SPI_ERROR_IO;
+    // }
+    // debug_printf("成功发送SPI写数据命令，SPI索引: %d, 数据长度: %d字节", SPIIndex, WriteLen);
     return SPI_SUCCESS;
 }
