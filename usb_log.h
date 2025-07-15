@@ -22,12 +22,7 @@ extern "C" {
  */
 void USB_SetLog(int enable);
 
-/**
- * @brief 调试输出函数
- * 
- * @param format 格式化字符串
- * @param ... 可变参数
- */
+
 void debug_printf(const char* format, ...);
 
 #ifdef __cplusplus

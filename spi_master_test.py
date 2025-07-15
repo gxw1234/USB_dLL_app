@@ -184,14 +184,9 @@ def main():
     time.sleep(1)
     if handle >= 0:
         print(f"设备打开成功，句柄: {handle}")
-
-
-
-
-
         print("\n测试SPI初始化功能...")
         # 定义SPI相关常量
-        SPI1_CS0 = 0
+        SPI1_CS0 = 1
         SPI_SUCCESS = 0
         
         # 创建SPI配置结构体

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// 通用命令包头结构
+
 typedef struct _GENERIC_CMD_HEADER {
   uint8_t protocol_type;  // 协议类型：SPI/IIC/UART/GPIO等
   uint8_t cmd_id;         // 命令ID：初始化/读/写等
@@ -16,51 +16,30 @@ typedef struct _GENERIC_CMD_HEADER {
   uint16_t total_packets; // 整包总数
 } GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
 
-// 简化的参数头结构
+
 typedef struct _PARAM_HEADER {
   uint16_t param_len;     // 参数长度
 } PARAM_HEADER, *PPARAM_HEADER;
 
-// 内部辅助函数声明
+
 extern void debug_printf(const char *format, ...);
 
-/**
- * @brief 添加参数到参数缓冲区
- * 
- * @param buffer 目标缓冲区
- * @param pos 当前位置指针
- * @param data 参数数据
- * @param len 参数长度
- * @return int 添加后的位置
- */
-static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t len) {
-    PARAM_HEADER header;
-    header.param_len = len;
-    memcpy(buffer + pos, &header, sizeof(PARAM_HEADER));
-    pos += sizeof(PARAM_HEADER);
-    memcpy(buffer + pos, data, len);
-    pos += len;
-    
-    return pos;
-}
 
 
-WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t OutputMask) {
+
+
+WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t pull_mode) {
     debug_printf("GPIO_SetOutput开始执行");
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return USB_ERROR_INVALID_PARAM;
     }
-    
-
-    
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
         return USB_ERROR_OTHER;
     }
     
-    // 组包协议头和数据（使用通用参数格式）
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_GPIO;
     cmd_header.cmd_id = CMD_SET_DIR;
@@ -81,7 +60,7 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
     param_header.param_len = sizeof(uint8_t);
     memcpy(send_buffer + pos, &param_header, sizeof(PARAM_HEADER));
     pos += sizeof(PARAM_HEADER);
-    memcpy(send_buffer + pos, &OutputMask, sizeof(uint8_t));
+    memcpy(send_buffer + pos, &pull_mode, sizeof(uint8_t));
     pos += sizeof(uint8_t);
     uint32_t end_marker = CMD_END_MARKER;
     memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
@@ -89,6 +68,51 @@ WINAPI int GPIO_SetOutput(const char* target_serial, int GPIOIndex, uint8_t Outp
     free(send_buffer);
     
     debug_printf("GPIO设置输出结果: %d", ret);
+    return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
+}
+
+WINAPI int GPIO_SetInput(const char* target_serial, int GPIOIndex, uint8_t pull_mode) {
+    debug_printf("GPIO_SetInput开始执行");
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return USB_ERROR_INVALID_PARAM;
+    }
+
+    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
+    }
+    
+    // 组包协议头和数据（使用通用参数格式）
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_GPIO;
+    cmd_header.cmd_id = CMD_SET_DIR;  // 使用相同的设置方向命令
+    cmd_header.device_index = (uint8_t)GPIOIndex;
+    cmd_header.param_count = 1;
+    cmd_header.data_len = 0; // 数据部分长度为0，参数通过参数区传递
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
+    if (!send_buffer) {
+        debug_printf("内存分配失败");
+        return USB_ERROR_OTHER;
+    }
+    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    int pos = sizeof(GENERIC_CMD_HEADER);
+    // 添加参数头和参数体
+    PARAM_HEADER param_header;
+    param_header.param_len = sizeof(uint8_t);
+    memcpy(send_buffer + pos, &param_header, sizeof(PARAM_HEADER));
+    pos += sizeof(PARAM_HEADER);
+    memcpy(send_buffer + pos, &pull_mode, sizeof(uint8_t));
+    pos += sizeof(uint8_t);
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    debug_printf("GPIO设置输入结果: %d", ret);
     return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }
 

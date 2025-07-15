@@ -8,7 +8,7 @@ from PIL import Image
 import os
 import ctypes
 import time
-from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
+
 from ctypes import *
 
 # 定义设备信息结构体
@@ -142,7 +142,7 @@ def main():
     usb_application.GPIO_Write.restype = c_int
     
     # 选择GPIO端口
-    gpio_index = GPIO_PORT0
+    gpio_index = 30
     
     # 测试USB通信是否正常工作
     print("\n测试USB调试日志是否工作...")
@@ -183,7 +183,7 @@ def main():
     print(f"GPIO_SetOutput返回值: {set_output_result}\n")
     if set_output_result == GPIO_SUCCESS:
         print(f"成功设置GPIO端口{gpio_index}的第一个引脚为输出模式")
-        for i in range(10):
+        for i in range(1):
             # 简单测试 - 只拉高一个引脚
             led_value = 0x01  # 只点亮第一个LED
             write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
@@ -194,8 +194,6 @@ def main():
             time.sleep(1)
             write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
             time.sleep(1)
-
-
     else:
         print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
     
