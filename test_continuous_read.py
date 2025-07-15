@@ -48,7 +48,7 @@ def main():
     # 扫描设备
     print("正在扫描USB设备...")
     devices = (DeviceInfo * 10)()
-    device_count = usb_dll.USB_ScanDevice(devices, 10)
+    device_count = usb_dll.USB_ScanDevices(devices, 10)
     
     if device_count <= 0:
         print(f"扫描失败或未找到设备: {device_count}")

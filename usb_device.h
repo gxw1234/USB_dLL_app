@@ -14,13 +14,13 @@ extern "C" {
 #include <stdint.h>
 #include "usb_log.h"
 
-// libusb相关定义
+
 #define LIBUSB_SUCCESS         0
 #define LIBUSB_ERROR_IO       -1
 #define LIBUSB_ERROR_TIMEOUT  -7
 #define LIBUSB_ERROR_NOT_FOUND -5
 
-// 错误代码定义
+
 #define USB_SUCCESS            0    // 成功
 #define USB_ERROR_NOT_FOUND   -1    // 设备未找到
 #define USB_ERROR_ACCESS      -2    // 访问被拒绝
@@ -28,7 +28,6 @@ extern "C" {
 #define USB_ERROR_INVALID_PARAM -4  // 参数无效
 #define USB_ERROR_OTHER       -99   // 其他错误
 
-// 设备描述符结构体
 typedef struct {
     unsigned char  bLength;
     unsigned char  bDescriptorType;
@@ -46,7 +45,7 @@ typedef struct {
     unsigned char  bNumConfigurations;
 } usb_device_descriptor;
 
-// 设备相关函数声明
+
 int usb_device_init(void);
 void usb_device_cleanup(void);
 int usb_device_get_device_list(void* ctx, void*** device_list);

@@ -14,7 +14,11 @@ extern "C" {
 #include <stdint.h>
 #include <windows.h>
 
-// 环形缓冲区结构
+
+#define PROTOCOL_SPI        0x01    // SPI协议
+#define PROTOCOL_POWER      0x05    // 电源协议
+#define MAX_PROTOCOL_TYPES  6       // 最大协议类型数量(0=未使用, 1=SPI, 5=POWER)
+
 typedef struct {
     unsigned char* buffer;     // 缓冲区指针
     unsigned int size;         // 缓冲区大小
@@ -24,7 +28,7 @@ typedef struct {
     CRITICAL_SECTION cs;       // 临界区，用于线程同步
 } ring_buffer_t;
 
-// 设备信息结构（从应用层移到这里，避免循环依赖）
+
 typedef struct {
     char serial[64];           // 设备序列号
     char description[128];     // 设备描述
@@ -42,20 +46,19 @@ typedef enum {
     DEVICE_STATE_ERROR         // 设备错误状态
 } device_state_t;
 
-// 设备句柄结构
 typedef struct {
-    char serial[64];           // 设备序列号
-    void* libusb_handle;       // libusb设备句柄
-    device_state_t state;      // 设备状态
-    int interface_claimed;     // 接口是否已申请
-    unsigned int ref_count;    // 引用计数
-    unsigned int last_access;  // 最后访问时间
-    int device_id;             // 设备ID
-    // 新增：后台读取线程和环形缓冲区
-    void* read_thread;         // 读取线程句柄（使用void*避免Windows类型依赖）
-    int thread_running;        // 线程运行标志
-    int stop_thread;           // 线程停止请求标志
-    ring_buffer_t ring_buffer; // 环形缓冲区
+    char serial[64];           
+    void* libusb_handle;       
+    device_state_t state;     
+    int interface_claimed;    
+    unsigned int ref_count;    
+    unsigned int last_access;  
+    int device_id;             
+    void* read_thread;        
+    int thread_running;       
+    int stop_thread;           
+    ring_buffer_t protocol_buffers[MAX_PROTOCOL_TYPES]; 
+    ring_buffer_t raw_buffer;  
 } device_handle_t;
 
 // 错误代码定义
@@ -120,36 +123,26 @@ int usb_middleware_is_device_open(int device_id);
 
 // ==================== 统一数据读写接口 ====================
 
-/**
- * @brief 从USB设备读取数据
- * @param device_id 设备ID
- * @param data 数据缓冲区
- * @param length 要读取的数据长度
- * @return int 实际读取的数据长度，小于0表示错误
- */
+
 int usb_middleware_read_data(int device_id, unsigned char* data, int length);
 
-/**
- * @brief 向USB设备发送数据
- * @param device_id 设备ID
- * @param data 要发送的数据缓冲区
- * @param length 要发送的数据长度
- * @return int 实际发送的数据长度，小于0表示错误
- */
+
+int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length);
+
+
 int usb_middleware_write_data(int device_id, unsigned char* data, int length);
 
 // ==================== 内部工具函数 ====================
 
-/**
- * @brief 更新设备访问时间
- * @param device_id 设备ID
- */
+
+void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length);
+
+
+void write_to_ring_buffer(ring_buffer_t* rb, unsigned char* data, int length);
+
 void usb_middleware_update_device_access(int device_id);
 
-/**
- * @brief 获取设备数量
- * @return int 当前管理的设备数量
- */
+
 int usb_middleware_get_device_count(void);
 
 #ifdef __cplusplus

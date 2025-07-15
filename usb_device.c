@@ -12,7 +12,7 @@
 #include <stdarg.h>
 #include <time.h>
 
-// 全局变量
+
 static HMODULE hLibusbDll = NULL;
 void* g_libusb_context = NULL;
 int g_is_initialized = 0;
@@ -111,14 +111,10 @@ void usb_device_cleanup(void) {
     if (!g_is_initialized) {
         return;
     }
-
-    // 退出libusb
     if (g_libusb_context) {
         p_libusb_exit(g_libusb_context);
         g_libusb_context = NULL;
     }
-
-    // 卸载DLL
     if (hLibusbDll) {
         FreeLibrary(hLibusbDll);
         hLibusbDll = NULL;
@@ -127,7 +123,6 @@ void usb_device_cleanup(void) {
     g_is_initialized = 0;
 }
 
-// 获取设备列表
 int usb_device_get_device_list(void* ctx, void*** device_list) {
     if (!g_is_initialized || !device_list) {
         debug_printf("获取设备列表失败: 未初始化或参数无效");
@@ -138,14 +133,11 @@ int usb_device_get_device_list(void* ctx, void*** device_list) {
     return count;
 }
 
-// 释放设备列表
 void usb_device_free_device_list(void** list, int unref_devices) {
     if (g_is_initialized && list) {
         p_libusb_free_device_list(list, unref_devices);
     }
 }
-
-// 获取设备描述符
 int usb_device_get_device_descriptor(void* dev, usb_device_descriptor* desc) {
     if (!g_is_initialized || !dev || !desc) {
         debug_printf("获取设备描述符失败: 未初始化或参数无效");
@@ -160,7 +152,6 @@ int usb_device_get_device_descriptor(void* dev, usb_device_descriptor* desc) {
     return ret;
 }
 
-// 打开设备
 int usb_device_open(void* dev, void** handle) {
     if (!g_is_initialized || !dev || !handle) {
         debug_printf("打开设备失败: 未初始化或参数无效");
@@ -180,7 +171,6 @@ void usb_device_close(void* handle) {
     }
 }
 
-// 获取字符串描述符
 int usb_device_get_string_descriptor_ascii(void* handle, uint8_t desc_index, unsigned char* data, int length) {
     if (!g_is_initialized || !handle || !data || length <= 0) {
         debug_printf("获取字符串描述符失败: 未初始化或参数无效");
@@ -193,7 +183,6 @@ int usb_device_get_string_descriptor_ascii(void* handle, uint8_t desc_index, uns
     return ret;
 }
 
-// 申请接口
 int usb_device_claim_interface(void* handle, int interface_number) {
     if (!g_is_initialized || !handle) {
         return -1;
@@ -202,7 +191,6 @@ int usb_device_claim_interface(void* handle, int interface_number) {
     return ret;
 }
 
-// 释放接口
 int usb_device_release_interface(void* handle, int interface_number) {
     if (!g_is_initialized || !handle) {
         return -1;
@@ -211,27 +199,18 @@ int usb_device_release_interface(void* handle, int interface_number) {
     return ret;
 }
 
-// 批量传输
 int usb_device_bulk_transfer(void* handle, unsigned char endpoint, unsigned char* data, int length, int* transferred, unsigned int timeout) {
     if (!g_is_initialized || !handle || !data || length <= 0 || !transferred) {
         debug_printf("批量传输失败: 参数无效");
         return -1;
     }
     
-    // debug_printf("开始USB批量传输: endpoint=0x%02X, length=%d, timeout=%dms", endpoint, length, timeout);
-    
     int ret = p_libusb_bulk_transfer(handle, endpoint, data, length, transferred, timeout);
     
-    // if (ret == 0) {
-    //     debug_printf("USB批量传输成功: 实际传输 %d 字节", *transferred);
-    // } else {
-    //     debug_printf("USB批量传输失败: 错误码=%d", ret);
-    // }
-    
+
     return ret;
 }
 
-// 获取设备
 void* usb_device_get_device(void* handle) {
     if (!g_is_initialized || !handle) {
         return NULL;
@@ -239,7 +218,6 @@ void* usb_device_get_device(void* handle) {
     return p_libusb_get_device(handle);
 }
 
-// 打开指定VID和PID的设备
 void* usb_device_open_device_with_vid_pid(void* ctx, unsigned short vid, unsigned short pid) {
     if (!g_is_initialized) {
         return NULL;

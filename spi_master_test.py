@@ -285,7 +285,7 @@ def main():
                 # time.sleep(5)
 
 
-            write_buffer_size = 1
+            write_buffer_size = 10
             write_buffer = (c_ubyte * write_buffer_size)()
             for i in range(write_buffer_size):
                 write_buffer[i] = 1

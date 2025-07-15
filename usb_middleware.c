@@ -1,31 +1,38 @@
-/**
- * @file usb_middleware.c
- * @brief USB中间层实现 - 统一设备管理和所有协议实现
- */
+
 
 #include "usb_middleware.h"
 #include "usb_device.h"
 #include "usb_log.h"
+#include "usb_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <time.h>
 
-// 设备管理配置
-#define MAX_DEVICES 10
-#define RING_BUFFER_SIZE (10 * 1024 * 1024)  // 10MB环形缓冲区
+typedef struct _GENERIC_CMD_HEADER {
+    uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
+    uint8_t cmd_id;         // 命令ID：初始化/读/写等
+    uint8_t device_index;   // 设备索引
+    uint8_t param_count;    // 参数数量
+    uint16_t data_len;      // 数据部分长度
+    uint16_t total_packets; // 整包总数
+} GENERIC_CMD_HEADER;
 
-// 全局设备管理
+
+#define MAX_DEVICES 10
+#define SPI_BUFFER_SIZE (10 * 1024 * 1024)    // SPI专用缓冲区
+#define POWER_BUFFER_SIZE (128 * 1024)       // 电源数据缓冲区
+#define RAW_BUFFER_SIZE (512 * 1024)         //  原始数据临时缓冲区
+
+
 static device_handle_t g_devices[MAX_DEVICES];
 static int g_device_count = 0;
 static int g_next_device_id = 0;
 static int g_initialized = 0;
 
-// 调试输出函数
 extern void debug_printf(const char *format, ...);
 
-// 读取线程函数实现
 static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
     device_handle_t* device = (device_handle_t*)lpParameter;
     unsigned char temp_buffer[4096];
@@ -33,24 +40,7 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
         int actual_length = 0;
         int ret = usb_device_bulk_transfer(device->libusb_handle, 0x81, temp_buffer, sizeof(temp_buffer), &actual_length, 1000);
         if (ret == 0 && actual_length > 0) {
-            EnterCriticalSection(&device->ring_buffer.cs);
-            ring_buffer_t* rb = &device->ring_buffer;
-            if (rb->data_size + actual_length > rb->size) {
-                int discard = (rb->data_size + actual_length) - rb->size;
-                rb->read_pos = (rb->read_pos + discard) % rb->size;
-                rb->data_size -= discard;
-            }
-            if (rb->write_pos + actual_length <= rb->size) {
-                memcpy(rb->buffer + rb->write_pos, temp_buffer, actual_length);
-            } else {
-                int first_part = rb->size - rb->write_pos;
-                memcpy(rb->buffer + rb->write_pos, temp_buffer, first_part);
-                memcpy(rb->buffer, temp_buffer + first_part, actual_length - first_part);
-            }
-            rb->write_pos = (rb->write_pos + actual_length) % rb->size;
-            rb->data_size += actual_length;
-            
-            LeaveCriticalSection(&device->ring_buffer.cs);
+            parse_and_dispatch_protocol_data(device, temp_buffer, actual_length);
         } else if (ret == -7) {
             debug_printf("读取超时");
             Sleep(10);
@@ -61,6 +51,62 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
     }
 
     return 0;
+}
+
+
+void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length) {
+    int pos = 0;
+    while (pos < length) {
+        if (pos + sizeof(GENERIC_CMD_HEADER) > length) {
+
+            EnterCriticalSection(&device->raw_buffer.cs);
+            write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
+            LeaveCriticalSection(&device->raw_buffer.cs);
+            break;
+        }
+        
+        GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)(raw_data + pos);
+        int packet_size = sizeof(GENERIC_CMD_HEADER) + header->data_len;
+
+        if (pos + packet_size > length) {
+
+            EnterCriticalSection(&device->raw_buffer.cs);
+            write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
+            LeaveCriticalSection(&device->raw_buffer.cs);
+            break;
+        }
+        
+        if (header->protocol_type == PROTOCOL_SPI) {
+
+            unsigned char* spi_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
+            int spi_data_len = header->data_len;
+            
+            EnterCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
+            write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_SPI], spi_data, spi_data_len);
+            LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
+            
+            debug_printf("分发SPI数据: %d字节", spi_data_len);
+        }
+        
+        pos += packet_size;
+    }
+}
+
+void write_to_ring_buffer(ring_buffer_t* rb, unsigned char* data, int length) {
+    if (rb->data_size + length > rb->size) {
+        int discard = (rb->data_size + length) - rb->size;
+        rb->read_pos = (rb->read_pos + discard) % rb->size;
+        rb->data_size -= discard;
+    }
+    if (rb->write_pos + length <= rb->size) {
+        memcpy(rb->buffer + rb->write_pos, data, length);
+    } else {
+        int first_part = rb->size - rb->write_pos;
+        memcpy(rb->buffer + rb->write_pos, data, first_part);
+        memcpy(rb->buffer, data + first_part, length - first_part);
+    }
+    rb->write_pos = (rb->write_pos + length) % rb->size;
+    rb->data_size += length;
 }
 
 
@@ -96,7 +142,6 @@ void usb_middleware_cleanup(void) {
         }
     }
     
-    // 清理设备层
     usb_device_cleanup();
     
     memset(g_devices, 0, sizeof(g_devices));
@@ -124,28 +169,22 @@ int usb_middleware_scan_devices(device_info_t* devices, int max_devices) {
     
     int device_count = 0;
     
-    // 遍历设备列表
     for (int i = 0; i < cnt && device_count < max_devices; i++) {
         void* dev = device_list[i];
         usb_device_descriptor desc;
         
-        // 获取设备描述符
         if (usb_device_get_device_descriptor(dev, &desc) != 0) {
             continue;
         }
         
-        // 检查VID和PID（这里需要根据实际设备调整）
         if (desc.idVendor == 0xCCDD && desc.idProduct == 0xAABB) {
-            // 打开设备以获取详细信息
             void* handle = NULL;
             if (usb_device_open(dev, &handle) != 0) {
                 continue;
             }
             
-            // 初始化设备信息结构体
             memset(&devices[device_count], 0, sizeof(device_info_t));
             
-            // 获取序列号
             if (desc.iSerialNumber > 0) {
                 unsigned char serial_buffer[64] = {0};
                 if (usb_device_get_string_descriptor_ascii(handle, desc.iSerialNumber, serial_buffer, sizeof(serial_buffer)) > 0) {
@@ -153,7 +192,6 @@ int usb_middleware_scan_devices(device_info_t* devices, int max_devices) {
                 }
             }
             
-            // 获取产品描述
             if (desc.iProduct > 0) {
                 unsigned char desc_buffer[256] = {0};
                 if (usb_device_get_string_descriptor_ascii(handle, desc.iProduct, desc_buffer, sizeof(desc_buffer)) > 0) {
@@ -161,7 +199,6 @@ int usb_middleware_scan_devices(device_info_t* devices, int max_devices) {
                 }
             }
             
-            // 获取制造商信息
             if (desc.iManufacturer > 0) {
                 unsigned char manufacturer_buffer[256] = {0};
                 if (usb_device_get_string_descriptor_ascii(handle, desc.iManufacturer, manufacturer_buffer, sizeof(manufacturer_buffer)) > 0) {
@@ -169,10 +206,8 @@ int usb_middleware_scan_devices(device_info_t* devices, int max_devices) {
                 }
             }
             
-            // 设置设备ID（暂时使用索引）
             devices[device_count].device_id = device_count;
             
-            // 关闭设备句柄
             usb_device_close(handle);
             
             device_count++;
@@ -195,7 +230,6 @@ int usb_middleware_open_device(const char* serial) {
         return USB_ERROR_OTHER;
     }
     
-    // 查找空闲设备槽
     int slot = -1;
     for (int i = 0; i < MAX_DEVICES; i++) {
         if (g_devices[i].state == DEVICE_STATE_CLOSED) {
@@ -209,7 +243,6 @@ int usb_middleware_open_device(const char* serial) {
         return USB_ERROR_OTHER;
     }
     
-    // 获取设备列表
     void** device_list = NULL;
     int cnt = usb_device_get_device_list(g_libusb_context, &device_list);
     if (cnt < 0) {
@@ -219,19 +252,15 @@ int usb_middleware_open_device(const char* serial) {
     
     void* device_handle = NULL;
     
-    // 遍历设备列表查找目标设备
     for (int i = 0; i < cnt; i++) {
         void* dev = device_list[i];
         usb_device_descriptor desc;
         
-        // 获取设备描述符
         if (usb_device_get_device_descriptor(dev, &desc) != 0) {
             continue;
         }
         
-        // 检查VID和PID（这里需要根据实际设备调整）
         if (desc.idVendor == 0xCCDD && desc.idProduct == 0xAABB) {
-            // 如果指定了序列号，需要检查序列号匹配
             if (serial) {
                 void* temp_handle = NULL;
                 if (usb_device_open(dev, &temp_handle) == 0) {
@@ -254,7 +283,6 @@ int usb_middleware_open_device(const char* serial) {
         }
     }
     
-    // 释放设备列表
     usb_device_free_device_list(device_list, 1);
     
     if (!device_handle) {
@@ -262,14 +290,12 @@ int usb_middleware_open_device(const char* serial) {
         return USB_ERROR_ACCESS;
     }
     
-    // 申请接口
     if (usb_device_claim_interface(device_handle, 0) != 0) {
         usb_device_close(device_handle);
         debug_printf("申请接口失败");
         return USB_ERROR_ACCESS;
     }
     
-    // 初始化设备信息
     g_devices[slot].libusb_handle = device_handle;
     g_devices[slot].state = DEVICE_STATE_OPEN;
     g_devices[slot].interface_claimed = 1;
@@ -285,23 +311,39 @@ int usb_middleware_open_device(const char* serial) {
     
     g_device_count++;
     
-    // 分配环形缓冲区、初始化临界区
-    ring_buffer_t* rb = &g_devices[slot].ring_buffer;
-    rb->size = RING_BUFFER_SIZE;
-    rb->buffer = (unsigned char*)malloc(RING_BUFFER_SIZE);
-    rb->write_pos = 0;
-    rb->read_pos = 0;
-    rb->data_size = 0;
-    InitializeCriticalSection(&rb->cs);
+    ring_buffer_t* spi_rb = &g_devices[slot].protocol_buffers[PROTOCOL_SPI];
+    spi_rb->size = SPI_BUFFER_SIZE;
+    spi_rb->buffer = (unsigned char*)malloc(SPI_BUFFER_SIZE);
+    spi_rb->write_pos = 0;
+    spi_rb->read_pos = 0;
+    spi_rb->data_size = 0;
+    InitializeCriticalSection(&spi_rb->cs);
+    
+    ring_buffer_t* power_rb = &g_devices[slot].protocol_buffers[PROTOCOL_POWER];
+    power_rb->size = POWER_BUFFER_SIZE;
+    power_rb->buffer = (unsigned char*)malloc(POWER_BUFFER_SIZE);
+    power_rb->write_pos = 0;
+    power_rb->read_pos = 0;
+    power_rb->data_size = 0;
+    InitializeCriticalSection(&power_rb->cs);
+    
+    ring_buffer_t* raw_rb = &g_devices[slot].raw_buffer;
+    raw_rb->size = RAW_BUFFER_SIZE;
+    raw_rb->buffer = (unsigned char*)malloc(RAW_BUFFER_SIZE);
+    raw_rb->write_pos = 0;
+    raw_rb->read_pos = 0;
+    raw_rb->data_size = 0;
+    InitializeCriticalSection(&raw_rb->cs);
+    
     g_devices[slot].stop_thread = FALSE;
     g_devices[slot].thread_running = TRUE;
-    // 日志确认
-    // debug_printf("分配buffer: device=%p, buffer=%p, size=%u", &g_devices[slot], rb->buffer, rb->size);
-    // 启动线程
+    
     g_devices[slot].read_thread = CreateThread(NULL, 0, usb_device_read_thread_func, &g_devices[slot], 0, NULL);
     if (!g_devices[slot].read_thread) {
-        DeleteCriticalSection(&rb->cs);
-        free(rb->buffer);
+        DeleteCriticalSection(&spi_rb->cs);
+        DeleteCriticalSection(&raw_rb->cs);
+        free(spi_rb->buffer);
+        free(raw_rb->buffer);
         usb_device_release_interface(device_handle, 0);
         usb_device_close(device_handle);
         g_devices[slot].state = DEVICE_STATE_CLOSED;
@@ -328,7 +370,6 @@ int usb_middleware_close_device(int device_id) {
         return USB_ERROR_OTHER;
     }
     
-    // 查找设备
     int slot = -1;
     for (int i = 0; i < MAX_DEVICES; i++) {
         if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
@@ -344,8 +385,6 @@ int usb_middleware_close_device(int device_id) {
     
     debug_printf("找到设备槽位: %d, 序列号: %s", slot, g_devices[slot].serial);
     
-    // 新增：停止线程、释放缓冲区
-    ring_buffer_t* rb = &g_devices[slot].ring_buffer;
     if (g_devices[slot].read_thread) {
         debug_printf("停止读取线程: 设备ID %d", device_id);
         g_devices[slot].stop_thread = TRUE;
@@ -361,19 +400,37 @@ int usb_middleware_close_device(int device_id) {
     }
     
     debug_printf("释放环形缓冲区: 设备ID %d", device_id);
-    EnterCriticalSection(&rb->cs);
-    if (rb->buffer) {
-        free(rb->buffer);
-        rb->buffer = NULL;
+
+    ring_buffer_t* spi_rb = &g_devices[slot].protocol_buffers[PROTOCOL_SPI];
+    EnterCriticalSection(&spi_rb->cs);
+    if (spi_rb->buffer) {
+        free(spi_rb->buffer);
+        spi_rb->buffer = NULL;
     }
-    LeaveCriticalSection(&rb->cs);
-    DeleteCriticalSection(&rb->cs);
+    LeaveCriticalSection(&spi_rb->cs);
+    DeleteCriticalSection(&spi_rb->cs);
     
-    // 调用设备层关闭设备
+    ring_buffer_t* power_rb = &g_devices[slot].protocol_buffers[PROTOCOL_POWER];
+    EnterCriticalSection(&power_rb->cs);
+    if (power_rb->buffer) {
+        free(power_rb->buffer);
+        power_rb->buffer = NULL;
+    }
+    LeaveCriticalSection(&power_rb->cs);
+    DeleteCriticalSection(&power_rb->cs);
+    
+    ring_buffer_t* raw_rb = &g_devices[slot].raw_buffer;
+    EnterCriticalSection(&raw_rb->cs);
+    if (raw_rb->buffer) {
+        free(raw_rb->buffer);
+        raw_rb->buffer = NULL;
+    }
+    LeaveCriticalSection(&raw_rb->cs);
+    DeleteCriticalSection(&raw_rb->cs);
+    
     debug_printf("关闭设备句柄: 设备ID %d", device_id);
     usb_device_close(g_devices[slot].libusb_handle);
     
-    // 清理设备信息
     memset(&g_devices[slot], 0, sizeof(device_handle_t));
     g_device_count--;
     
@@ -424,7 +481,6 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length) {
         return USB_ERROR_INVALID_PARAM;
     }
     
-    // 查找设备
     int slot = -1;
     for (int i = 0; i < MAX_DEVICES; i++) {
         if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
@@ -438,11 +494,8 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length) {
         return USB_ERROR_NOT_FOUND;
     }
     
-    // 更新访问时间
     usb_middleware_update_device_access(device_id);
-    
-    // 新增：从环形缓冲区读取数据
-    ring_buffer_t* rb = &g_devices[slot].ring_buffer;
+    ring_buffer_t* rb = &g_devices[slot].raw_buffer;
     EnterCriticalSection(&rb->cs);
     int available = rb->data_size;
     int to_read = (available < length) ? available : length;
@@ -470,15 +523,12 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length) {
     return to_read;
 }
 
-/**
- * @brief 向USB设备发送数据
- */
+
 int usb_middleware_write_data(int device_id, unsigned char* data, int length) {
     if (!g_initialized || !data || length <= 0) {
         return USB_ERROR_INVALID_PARAM;
     }
     
-    // 查找设备
     int slot = -1;
     for (int i = 0; i < MAX_DEVICES; i++) {
         if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
@@ -492,10 +542,8 @@ int usb_middleware_write_data(int device_id, unsigned char* data, int length) {
         return USB_ERROR_NOT_FOUND;
     }
     
-    // 更新访问时间
     usb_middleware_update_device_access(device_id);
     
-    // 调用设备层写入数据
     int transferred = 0;
     int ret = usb_device_bulk_transfer(g_devices[slot].libusb_handle, 0x01, data, length, &transferred, 1000);
     if (ret < 0) {
@@ -506,9 +554,6 @@ int usb_middleware_write_data(int device_id, unsigned char* data, int length) {
     return transferred;
 }
 
-/**
- * @brief 更新设备访问时间
- */
 void usb_middleware_update_device_access(int device_id) {
     for (int i = 0; i < MAX_DEVICES; i++) {
         if (g_devices[i].device_id == device_id) {
@@ -523,4 +568,45 @@ void usb_middleware_update_device_access(int device_id) {
  */
 int usb_middleware_get_device_count(void) {
     return g_device_count;
+}
+
+
+int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length) {
+    if (!g_initialized || !data || length <= 0) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int slot = -1;
+    for (int i = 0; i < MAX_DEVICES; i++) {
+        if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == -1) {
+        debug_printf("设备未找到或未打开: %d", device_id);
+        return USB_ERROR_NOT_FOUND;
+    }
+    usb_middleware_update_device_access(device_id);
+    ring_buffer_t* spi_rb = &g_devices[slot].protocol_buffers[PROTOCOL_SPI];
+    EnterCriticalSection(&spi_rb->cs);
+    int available = spi_rb->data_size;
+    int to_read = (available < length) ? available : length;
+    if (to_read > 0) {
+        if (spi_rb->read_pos + to_read <= spi_rb->size) {
+            memcpy(data, spi_rb->buffer + spi_rb->read_pos, to_read);
+        } else {
+            int first_part = spi_rb->size - spi_rb->read_pos;
+            memcpy(data, spi_rb->buffer + spi_rb->read_pos, first_part);
+            memcpy(data + first_part, spi_rb->buffer, to_read - first_part);
+        }
+        spi_rb->read_pos = (spi_rb->read_pos + to_read) % spi_rb->size;
+        spi_rb->data_size -= to_read;
+    }
+    LeaveCriticalSection(&spi_rb->cs);
+    
+    if (to_read > 0) {
+        debug_printf("从SPI缓冲区读取了 %d 字节数据", to_read);
+    }
+    
+    return to_read;
 } 

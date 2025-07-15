@@ -22,15 +22,7 @@ typedef struct _PARAM_HEADER {
 
 extern void debug_printf(const char *format, ...);
 
-/**
- * @brief 添加参数到参数缓冲区
- * 
- * @param buffer 目标缓冲区
- * @param pos 当前位置指针
- * @param data 参数数据
- * @param len 参数长度
- * @return int 添加后的位置
- */
+
 static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t len) {
     PARAM_HEADER header;
     header.param_len = len;
@@ -42,14 +34,7 @@ static int Add_Parameter(unsigned char* buffer, int pos, void* data, uint16_t le
     return pos;
 }
 
-/**
- * @brief 初始化SPI
- * 
- * @param target_serial 目标设备的序列号
- * @param SPIIndex SPI索引
- * @param pConfig SPI配置结构体
- * @return int 成功返回0，失败返回错误代码
- */
+
 int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
     if (!target_serial || !pConfig) {
         debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);
@@ -98,15 +83,7 @@ int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
     return SPI_SUCCESS;
 }
 
-/**
- * @brief 通过SPI发送数据
- * 
- * @param target_serial 目标设备的序列号
- * @param SPIIndex SPI索引
- * @param pWriteBuffer 要发送的数据缓冲区
- * @param WriteLen 要发送的数据长度
- * @return int 成功返回0，失败返回错误代码
- */
+
 int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen) {
     if (!target_serial || !pWriteBuffer || WriteLen <= 0) {
         debug_printf("参数无效: target_serial=%p, pWriteBuffer=%p, WriteLen=%d", target_serial, pWriteBuffer, WriteLen);
@@ -121,7 +98,7 @@ int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWrit
         debug_printf("设备未打开: %s", target_serial);
         return SPI_ERROR_OTHER;
     }
-    // 组包协议头和数据
+
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;    // SPI协议
     cmd_header.cmd_id = CMD_WRITE;             // 写数据命令
@@ -156,4 +133,29 @@ int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWrit
     // }
     // debug_printf("成功发送SPI写数据命令，SPI索引: %d, 数据长度: %d字节", SPIIndex, WriteLen);
     return SPI_SUCCESS;
+}
+
+
+int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* pReadBuffer, int ReadLen) {
+    if (!target_serial || !pReadBuffer || ReadLen <= 0) {
+        debug_printf("参数无效: target_serial=%p, pReadBuffer=%p, ReadLen=%d", target_serial, pReadBuffer, ReadLen);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+    
+    int actual_read = usb_middleware_read_spi_data(device_id, pReadBuffer, ReadLen);
+    if (actual_read < 0) {
+        debug_printf("从SPI缓冲区读取数据失败: %d", actual_read);
+        return SPI_ERROR_IO;
+    }
+    
+    if (actual_read > 0) {
+        debug_printf("成功读取SPI数据，SPI索引: %d, 数据长度: %d字节", SPIIndex, actual_read);
+    }
+    return actual_read;
 }

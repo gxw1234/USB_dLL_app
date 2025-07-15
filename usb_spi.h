@@ -64,6 +64,17 @@ WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig
  */
 WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
 
+/**
+ * @brief 从SPI设备读取数据（从机模式）
+ * 
+ * @param target_serial 目标设备的序列号
+ * @param SPIIndex SPI索引
+ * @param pReadBuffer 读取数据的缓冲区
+ * @param ReadLen 要读取的数据长度
+ * @return int 实际读取的数据长度，失败返回错误代码
+ */
+WINAPI int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* pReadBuffer, int ReadLen);
+
 #ifdef __cplusplus
 }
 #endif

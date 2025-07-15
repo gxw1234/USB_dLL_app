@@ -39,7 +39,6 @@ static int find_free_device_slot(void) {
     return -1;
 }
 
-// 根据序列号查找已打开的设备
 static int find_device_by_serial(const char* serial) {
     if (!serial) {
         return -1;
@@ -54,6 +53,7 @@ static int find_device_by_serial(const char* serial) {
 }
 
 // ==================== 设备管理接口 ====================
+
 
 /**
  * @brief 初始化USB应用层
@@ -70,21 +70,14 @@ WINAPI int USB_Init(void) {
     return ret;
 }
 
-/**
- * @brief 清理USB应用层
- */
+
 WINAPI void USB_Exit(void) {
     debug_printf("清理USB应用层...");
     usb_middleware_cleanup();
     debug_printf("USB应用层清理完成");
 }
 
-/**
- * @brief 扫描USB设备
- * @param devices 设备信息数组
- * @param max_devices 最大设备数
- * @return int 扫描到的设备数量
- */
+
 WINAPI int USB_ScanDevices(device_info_t* devices, int max_devices) {
     if (!devices || max_devices <= 0) {
         debug_printf("参数无效: devices=%p, max_devices=%d", devices, max_devices);
@@ -96,11 +89,7 @@ WINAPI int USB_ScanDevices(device_info_t* devices, int max_devices) {
     return count;
 }
 
-/**
- * @brief 打开USB设备
- * @param serial 设备序列号，NULL表示打开第一个可用设备
- * @return int 成功返回设备ID(≥0)，失败返回错误代码
- */
+
 WINAPI int USB_OpenDevice(const char* serial) {
     if (!serial) {
         debug_printf("打开第一个可用设备");
@@ -117,11 +106,7 @@ WINAPI int USB_OpenDevice(const char* serial) {
     return device_id;
 }
 
-/**
- * @brief 关闭USB设备
- * @param serial 设备序列号
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int USB_CloseDevice(const char* serial) {
     if (!serial) {
         debug_printf("关闭设备失败: 序列号参数为空");
@@ -142,11 +127,7 @@ WINAPI int USB_CloseDevice(const char* serial) {
     return ret;
 }
 
-/**
- * @brief 根据序列号查找设备ID
- * @param serial 设备序列号
- * @return int 设备ID，未找到返回-1
- */
+
 WINAPI int USB_FindDeviceBySerial(const char* serial) {
     if (!serial) {
         debug_printf("序列号参数为空");
@@ -162,38 +143,26 @@ WINAPI int USB_FindDeviceBySerial(const char* serial) {
     return device_id;
 }
 
-/**
- * @brief 检查设备是否已打开
- * @param device_id 设备ID
- * @return int 1=已打开，0=未打开，<0=错误
- */
+
 WINAPI int USB_IsDeviceOpen(int device_id) {
     int is_open = usb_middleware_is_device_open(device_id);
     debug_printf("设备 %d 状态: %s", device_id, is_open ? "已打开" : "未打开");
     return is_open;
 }
 
-/**
- * @brief 获取设备数量
- * @return int 当前管理的设备数量
- */
+
 WINAPI int USB_GetDeviceCount(void) {
     int count = usb_middleware_get_device_count();
     debug_printf("当前设备数量: %d", count);
     return count;
 }
 
-/**
- * @brief 设置USB调试日志状态
- * @param enable 1=启用日志，0=禁用日志
- */
+
 WINAPI void USB_SetLogging(int enable) {
     debug_printf("设置USB调试日志: %s", enable ? "启用" : "禁用");
-    // 调用日志模块的设置函数
     USB_SetLog(enable);
 }
 
-// DLL入口点
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:

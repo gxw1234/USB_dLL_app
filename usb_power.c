@@ -22,14 +22,7 @@ typedef struct _GENERIC_CMD_HEADER {
 
 extern void debug_printf(const char *format, ...);
 
-/**
- * @brief 设置电压
- * 
- * @param target_serial 目标设备的序列号
- * @param channel 电源通道
- * @param voltage_mv 电压值（单位：mV）
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int POWER_SetVoltage(const char* target_serial, uint8_t channel, uint16_t voltage_mv) {
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
@@ -47,7 +40,6 @@ WINAPI int POWER_SetVoltage(const char* target_serial, uint8_t channel, uint16_t
             return POWER_ERROR_OTHER;
         }
     }
-    // 组包协议头和数据
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_POWER;
     cmd_header.cmd_id = CMD_SET;
@@ -71,13 +63,6 @@ WINAPI int POWER_SetVoltage(const char* target_serial, uint8_t channel, uint16_t
     return POWER_SUCCESS;
 }
 
-/**
- * @brief 开始读取电流
- * 
- * @param target_serial 目标设备的序列号
- * @param channel 电流通道 (POWER_CHANNEL_UA 或 POWER_CHANNEL_MA)
- * @return int 成功返回0，失败返回错误代码
- */
 WINAPI int POWER_StartCurrentReading(const char* target_serial, uint8_t channel) {
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
@@ -113,13 +98,7 @@ WINAPI int POWER_StartCurrentReading(const char* target_serial, uint8_t channel)
     return POWER_SUCCESS;
 }
 
-/**
- * @brief 停止读取电流
- * 
- * @param target_serial 目标设备的序列号
- * @param channel 电流通道 (POWER_CHANNEL_UA 或 POWER_CHANNEL_MA)
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int POWER_StopCurrentReading(const char* target_serial, uint8_t channel) {
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
@@ -155,14 +134,7 @@ WINAPI int POWER_StopCurrentReading(const char* target_serial, uint8_t channel) 
     return POWER_SUCCESS;
 }
 
-/**
- * @brief 读取电流数据
- * 
- * @param target_serial 目标设备的序列号
- * @param channel 电流通道 (POWER_CHANNEL_UA 或 POWER_CHANNEL_MA)
- * @param current_value 用于接收电流值的指针（单位：微安或毫安）
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int POWER_ReadCurrentData(const char* target_serial, uint8_t channel, float* current_value) {
     if (!target_serial || !current_value) {
         debug_printf("参数无效: target_serial=%p, current_value=%p", target_serial, current_value);

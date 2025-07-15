@@ -121,9 +121,9 @@ def main():
         # 创建SPI配置结构体
         spi_config = SPI_CONFIG()
         spi_config.Mode = 0  # 硬件控制（全双工模式）
-        spi_config.Master = 0  # 主机模式
+        spi_config.Master = 0  # 从机模式
         spi_config.CPOL = 0
-        spi_config.CPHA = 1
+        spi_config.CPHA = 0
         spi_config.LSBFirst = 0  # MSB在前
         spi_config.SelPolarity = 0
         spi_config.ClockSpeedHz = 10000000  # 25MHz
@@ -149,6 +149,49 @@ def main():
 
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令")
+
+            # ===================================================
+            # 函数: SPI_SlaveReadBytes
+            # 描述: 从SPI设备读取数据（从机模式）
+            # 参数:
+            #   serial_param: 设备序列号
+            #   SPIIndex: SPI索引，指定使用哪个SPI接口和片选
+            #   pReadBuffer: 读取数据的缓冲区
+            #   ReadLen: 要读取的数据长度
+            # 返回值:
+            #   >=0: 实际读取的数据长度
+            #   <0: 读取失败，返回错误代码
+            # ===================================================
+            print("\n开始读取SPI数据...")
+            read_buffer_size = 20  # 读取缓冲区大小
+            read_buffer = (c_ubyte * read_buffer_size)()
+
+
+            for i in range(5):
+                read_result = usb_application.SPI_SlaveReadBytes(serial_param, SPI1_CS0, read_buffer, read_buffer_size)
+                if read_result > 0:
+                    print(f"第{i + 1}次读取成功，读取了{read_result}字节数据:")
+                    print_len = min(read_result, 20)
+                    print("数据内容: ", end="")
+                    for j in range(print_len):
+                        print(f"{read_buffer[j]:02X} ", end="")
+                    if read_result > 20:
+                        print("...")
+                    else:
+                        print()
+                elif read_result == 0:
+                    print(f"第{i + 1}次读取：没有可用数据")
+                else:
+                    print(f"第{i + 1}次读取失败，错误代码: {read_result}")
+
+                time.sleep(0.5)  # 等待500毫秒
+
+
+
+
+
+
+
 
 
         # ===================================================
