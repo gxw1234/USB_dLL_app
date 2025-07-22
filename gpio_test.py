@@ -141,16 +141,14 @@ def main():
     usb_application.GPIO_Write.argtypes = [c_char_p, c_int, c_ubyte]
     usb_application.GPIO_Write.restype = c_int
     
-    # 选择GPIO端口
-    gpio_index = 30
+
     
     # 测试USB通信是否正常工作
     print("\n测试USB调试日志是否工作...")
     usb_application.USB_SetLogging(0)  # 显式开启日志
     print("USB调试日志已开启\n")
     
-    # 检查Device句柄是否有效
-    print(f"\n设备序列号: {serial_param}")
+
     
     # ==================================================
     # 函数: USB_OpenDevice
@@ -174,34 +172,43 @@ def main():
         return
 
 
+    if 0:
+        # 选择GPIO端口
+        gpio_index = 7
+        set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
+        usb_application.GPIO_Write(serial_param, gpio_index, 1)  #默认状态
+        time.sleep(1)
+        #开始扫描
+        if set_output_result == GPIO_SUCCESS:
+            usb_application.GPIO_Write(serial_param, gpio_index, 0) #按下
+            time.sleep(3)
+            usb_application.GPIO_Write(serial_param, gpio_index, 1)  #抬起
+            print("执行完成")
+        else:
+            print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
+    if 1 :
+        # 选择GPIO端口
+        gpio_index = 8
+        set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
+        usb_application.GPIO_Write(serial_param, gpio_index, 0)  #默认状态，
+        time.sleep(1)
+        #开始扫描
+        if set_output_result == GPIO_SUCCESS:
+            for i in range(200):
+                usb_application.GPIO_Write(serial_param, gpio_index, 0) #断电
+                print(f'断电')
+                time.sleep(2)
+                usb_application.GPIO_Write(serial_param, gpio_index, 1)  #上电
+                time.sleep(5)
+                print(f'上电')
+        else:
+            print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
 
-    # 设置GPIO函数参数类型
-    # 设置第一个GPIO引脚为输出模式
-    print("\n尝试调用GPIO_SetOutput...")
-    output_mask = 0x01  # 只设置第一个引脚为输出
-    set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, output_mask)
-    print(f"GPIO_SetOutput返回值: {set_output_result}\n")
-    if set_output_result == GPIO_SUCCESS:
-        print(f"成功设置GPIO端口{gpio_index}的第一个引脚为输出模式")
-        for i in range(1):
-            # 简单测试 - 只拉高一个引脚
-            led_value = 0x01  # 只点亮第一个LED
-            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 1)
-            if write_result == GPIO_SUCCESS:
-                print(f"GPIO写入成功: 0x{led_value:02X} (只点亮第一个LED)")
-            else:
-                print(f"GPIO写入失败，错误代码: {write_result}")
-            time.sleep(1)
-            write_result = usb_application.GPIO_Write(serial_param, gpio_index, 0)
-            time.sleep(1)
-    else:
-        print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-    
 
 
-    
+
+
     # print("\n关闭设备...")
-    
     # ===================================================
     # 函数: USB_CloseDevice
     # 描述: 关闭USB设备连接

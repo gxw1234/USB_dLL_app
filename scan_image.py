@@ -2,7 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-简单的USB应用层测试脚本
+接线
+KEY接： P7
+CS接：  P6
+MO接：  P3
+SCLK接： P4
+SCL :   P25
+SDA  :P19
 """
 from PIL import Image
 import os
@@ -11,6 +17,14 @@ import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
 from ctypes import *
 
+SPI_FIRSTBIT_LSB  =1
+SPI_FIRSTBIT_MSB =0
+SPI_MODE_MASTER = 1
+SPI_MODE_SLAVE =0
+SPI_POLARITY_HIGH =1
+SPI_POLARITY_LOW =0
+SPI_PHASE_2EDGE =1
+SPI_PHASE_1EDGE =0
 
 # 定义设备信息结构体
 class DeviceInfo(Structure):
@@ -37,9 +51,46 @@ class SPI_CONFIG(Structure):
     ]
 
 
+# 定义电压配置结构体
+class VOLTAGE_CONFIG(Structure):
+    _fields_ = [
+        ("channel", c_ubyte),  # 电源通道
+        ("voltage", c_ushort)  # 电压值（单位：mV）
+    ]
+
+
+from numpy import array
+
+
+def image_sort(data: list):
+    image_format = "." + data[0].split(".")[1]
+    image_length_length = len(data[0].split(".")[0])
+    Formatting = "%0" + str(image_length_length) + "d"
+    im_split = [int(i.split(".")[0]) for i in data]
+    for i in range(len(im_split)):
+        for j in range(i + 1, (len(im_split))):
+            if im_split[i] > im_split[j]:
+                im_split[i], im_split[j] = im_split[j], im_split[i]
+    return [str(Formatting % i) + image_format for i in im_split]
 
 
 
+
+
+def hex_images(save_path: str) -> list:
+    file_dir = save_path
+    dir_list = os.listdir(file_dir)
+    data_list = []
+    data_list_sort = image_sort(dir_list)
+    for cur_file in data_list_sort:
+        # 获取文件的绝对路径
+        path = os.path.join(file_dir, cur_file)
+        im = Image.open(path)
+        img = im.convert('L')
+        img_array = array(img)
+        flat_img_array = img_array.flatten()
+        data_list.append((c_ubyte * len(flat_img_array))(*flat_img_array))
+    return data_list
 
 
 def main():
@@ -64,7 +115,6 @@ def main():
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
-
     print("调用 USB_ScanDevice 函数...")
 
     # ===================================================
@@ -78,6 +128,7 @@ def main():
     #   <0: 发生错误，返回错误代码
     # ===================================================
     result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
+
     print(f"扫描结果: {result}")
     if result > 0:
         print(f"找到 {result} 个USB设备:")
@@ -85,6 +136,7 @@ def main():
             serial = devices[i].serial.decode('utf-8', errors='ignore').strip('\x00')
             desc = devices[i].description.decode('utf-8', errors='ignore').strip('\x00')
             manufacturer = devices[i].manufacturer.decode('utf-8', errors='ignore').strip('\x00')
+            # 显示设备信息
             print(f"设备 {i + 1}:")
             print(f"  序列号: {serial}")
             print(f"  产品名称: {desc}")
@@ -119,12 +171,12 @@ def main():
         # 创建SPI配置结构体
         spi_config = SPI_CONFIG()
         spi_config.Mode = 0  # 硬件控制（全双工模式）
-        spi_config.Master = 0  # 从机模式
-        spi_config.CPOL = 0
-        spi_config.CPHA = 0
-        spi_config.LSBFirst = 0  # MSB在前
+        spi_config.Master = SPI_MODE_MASTER  # 主机模式
+        spi_config.CPOL = SPI_POLARITY_LOW
+        spi_config.CPHA = SPI_PHASE_2EDGE
+        spi_config.LSBFirst = SPI_FIRSTBIT_LSB
         spi_config.SelPolarity = 0
-        spi_config.ClockSpeedHz = 10000000  # 25MHz
+        spi_config.ClockSpeedHz = 25000000  # 25MHz
         # ===================================================
         # 函数: SPI_Init
         # 描述: 初始化SPI设备
@@ -139,57 +191,68 @@ def main():
         # 定义 SPI_Init 函数参数类型
 
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
-        # time.sleep(1)
+        #设置KEY  的GPIO  P7
+        key_gpio_index = 7
+        usb_application.GPIO_SetOpenDrain(serial_param, key_gpio_index, 1) #设置为GPIO_MODE_OUTPUT_OD模式  //@param pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
+        usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 默认状态 GPIO_PIN_RESET
 
-        gpio_index = 0x00
-        output_mask = 0x00  # 只设置第一个引脚为输出
-        # set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, output_mask)
+        # 设置复位  的GPIO  P8
+        reset_gpio_index = 8
+        usb_application.GPIO_SetOutput(serial_param, reset_gpio_index, 1)
+        usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)
 
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令")
-
+            SPIIndex = SPI1_CS0
             # ===================================================
-            # 函数: SPI_SlaveReadBytes
-            # 描述: 从SPI设备读取数据（从机模式）
+            # 函数: SPI_WriteBytes
+            # 描述: 通过SPI发送数据
             # 参数:
             #   serial_param: 设备序列号
             #   SPIIndex: SPI索引，指定使用哪个SPI接口和片选
-            #   pReadBuffer: 读取数据的缓冲区
-            #   ReadLen: 要读取的数据长度
+            #   write_buffer: 要发送的数据缓冲区
+            #   test_size: 要发送的数据长度(字节)
             # 返回值:
-            #   >=0: 实际读取的数据长度
-            #   <0: 读取失败，返回错误代码
+            #   =0: 成功发送SPI数据
+            #   <0: 发送失败，返回错误代码
             # ===================================================
-
-            print("\n开始读取SPI数据...")
-            read_buffer_size = 20  # 读取缓冲区大小
-            read_buffer = (c_ubyte * read_buffer_size)()
-            for i in range(5):
-                read_result = usb_application.SPI_SlaveReadBytes(serial_param, SPI1_CS0, read_buffer, read_buffer_size)
-                if read_result > 0:
-                    print(f"第{i + 1}次读取成功，读取了{read_result}字节数据:")
-                    print_len = min(read_result, 20)
-                    print("数据内容: ", end="")
-                    for j in range(print_len):
-                        print(f"{read_buffer[j]:02X} ", end="")
-                    if read_result > 20:
-                        print("...")
-                    else:
-                        print()
-                elif read_result == 0:
-                    print(f"第{i + 1}次读取：没有可用数据")
-                else:
-                    print(f"第{i + 1}次读取失败，错误代码: {read_result}")
-
-                time.sleep(0.5)  # 等待500毫秒
+            # 定义SPI_WriteBytes函数参数类型
+            usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
+            usb_application.SPI_WriteBytes.restype = c_int
+            path = r'D:\py\autoScan\2\0019_img_0019_out'
+            images = hex_images(path)
 
 
 
+            #测试之前先复位
+            usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)  # 断电
+            print(f'断电')
+            time.sleep(2)
+            usb_application.GPIO_Write(serial_param, reset_gpio_index, 1)  # 上电
+            time.sleep(5)
+            print(f'上电')
 
 
+            T1 =time.time()
+            usb_application.GPIO_Write(serial_param, key_gpio_index, 0)   #下压
+            time.sleep(0.1)
+            for i in images:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
+            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
+            print(f'end_tiem :{time.time() -T1}')
+            time.sleep(0.1)
+            for i in images[:8]:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
+            time.sleep(1)
+        else:
+            print(f"SPI初始化失败，错误代码: {1}")
 
+        # 等待一下，给设备处理时间
+        time.sleep(1)
 
-
+        print("\n关闭设备...")
 
         # ===================================================
         # 函数: USB_CloseDevice

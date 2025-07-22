@@ -243,53 +243,20 @@ def main():
             #   <0: 发送失败，返回错误代码
             # ===================================================
             # 定义SPI_WriteBytes函数参数类型
-            # usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
-            # usb_application.SPI_WriteBytes.restype = c_int
+            usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
+            usb_application.SPI_WriteBytes.restype = c_int
 
 
-            # print(f'断电')
-            # usb_application.GPIO_Write(serial_param, 9, 0)  #P9 拉高断电
-            # time.sleep(2)
-            # print(f'上电')
-            # usb_application.GPIO_Write(serial_param, 9, 1)   #P9 拉底上电
-            # time.sleep(5)
-
-            path = r'D:\py\autoScan\2\0019_img_0019_out'
-            images = hex_images(path)
-
-            # usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[0], len(images[0]))
 
 
-            # for  i in range(10):
-            #
-            #     print(f'断电')
-            #     usb_application.GPIO_Write(serial_param, 9, 0)  #P9 拉高断电
-            #     time.sleep(2)
-            #     print(f'上电')
-            #     usb_application.GPIO_Write(serial_param, 9, 1)   #P9 拉底上电
-            #     time.sleep(5)
-            #
-            #     T1 =time.time()
-            #     write_result = usb_application.GPIO_Write(serial_param, 5, 0)  #下压
-            #     time.sleep(0.1)
-            #     for i in images:
-            #         usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-            #         time.sleep(0.007)
-            #     write_result = usb_application.GPIO_Write(serial_param, 5, 1)  # 抬起
-            #     write_result = usb_application.GPIO_Write(serial_param, 5, 1)  # 抬起
-            #     print(f'end_tiem :{time.time() -T1}')
-                # time.sleep(0.1)
-                # for i in images[:8]:
-                #     usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                #     time.sleep(0.007)
-                # time.sleep(5)
 
-
-            write_buffer_size = 10
+            write_buffer_size = 100
             write_buffer = (c_ubyte * write_buffer_size)()
             for i in range(write_buffer_size):
-                write_buffer[i] = 1
+                write_buffer[i] = i
             a =time.time()
+            write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
+            time.sleep(1)
             write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
 
             print(f'temi{time.time()  -a}')

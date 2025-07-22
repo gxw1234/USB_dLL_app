@@ -57,6 +57,7 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
 void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length) {
     int pos = 0;
     while (pos < length) {
+        //检查是否有足够的字节来读取完整的协议头
         if (pos + sizeof(GENERIC_CMD_HEADER) > length) {
 
             EnterCriticalSection(&device->raw_buffer.cs);
@@ -68,6 +69,7 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
         GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)(raw_data + pos);
         int packet_size = sizeof(GENERIC_CMD_HEADER) + header->data_len;
 
+        // 检查是否有足够的字节来读取完整的数据包
         if (pos + packet_size > length) {
 
             EnterCriticalSection(&device->raw_buffer.cs);
@@ -75,17 +77,20 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             LeaveCriticalSection(&device->raw_buffer.cs);
             break;
         }
+        //检查是否有足够的字节来读取完整的数据包
         
         if (header->protocol_type == PROTOCOL_SPI) {
 
             unsigned char* spi_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
             int spi_data_len = header->data_len;
-            
+            //获取互斥锁，确保只有一个线程能访问共享资源
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
+            //将SPI数据写入到专用的环形缓冲区中
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_SPI], spi_data, spi_data_len);
+            //释放互斥锁，允许其他等待的线程访问共享资源
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
             
-            debug_printf("分发SPI数据: %d字节", spi_data_len);
+            // debug_printf("分发SPI数据: %d字节", spi_data_len);
         }
         
         pos += packet_size;
