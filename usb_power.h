@@ -43,6 +43,7 @@ WINAPI int POWER_StopCurrentReading(const char* target_serial, uint8_t channel);
 
 WINAPI int POWER_ReadCurrentData(const char* target_serial, uint8_t channel, float* current_value);
 
+
 #ifdef __cplusplus
 }
 #endif

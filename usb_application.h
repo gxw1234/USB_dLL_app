@@ -29,6 +29,17 @@ extern "C" {
     #define WINAPI
 #endif
 
+// ==================== 设备信息结构体 ====================
+
+typedef struct _DEVICE_INFO {
+    char    FirmwareName[32];       // 固件名称字符串
+    char    BuildDate[32];          // 固件编译时间字符串
+    int     HardwareVersion;        // 硬件版本号
+    int     FirmwareVersion;        // 固件版本号
+    int     SerialNumber[3];        // 适配器序列号
+    int     Functions;              // 适配器当前具备的功能
+} DEVICE_INFO, *PDEVICE_INFO;
+
 // ==================== 设备管理接口 ====================
 
 
@@ -44,8 +55,11 @@ WINAPI int USB_IsDeviceOpen(int device_id);
 
 WINAPI int USB_GetDeviceCount(void);
 
+WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* func_str);
 
 WINAPI void USB_SetLogging(int enable);
+
+
 
 #ifdef __cplusplus
 }

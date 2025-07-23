@@ -43,37 +43,16 @@ typedef struct _CMD_HEADER {
     unsigned short data_len;     // 数据长度
 } CMD_HEADER, *PCMD_HEADER;
 
-/**
- * @brief 初始化SPI
- * 
- * @param target_serial 目标设备的序列号
- * @param SPIIndex SPI索引
- * @param pConfig SPI配置结构体
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig);
 
-/**
- * @brief 通过SPI发送数据
- * 
- * @param target_serial 目标设备的序列号
- * @param SPIIndex SPI索引
- * @param pWriteBuffer 要发送的数据缓冲区
- * @param WriteLen 要发送的数据长度
- * @return int 成功返回0，失败返回错误代码
- */
+
 WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
 
-/**
- * @brief 从SPI设备读取数据（从机模式）
- * 
- * @param target_serial 目标设备的序列号
- * @param SPIIndex SPI索引
- * @param pReadBuffer 读取数据的缓冲区
- * @param ReadLen 要读取的数据长度
- * @return int 实际读取的数据长度，失败返回错误代码
- */
+
 WINAPI int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* pReadBuffer, int ReadLen);
+
+
 
 #ifdef __cplusplus
 }

@@ -22,6 +22,17 @@ class DeviceInfo(Structure):
         ("device_id", c_int)
     ]
 
+# 定义设备详细信息结构体
+class DeviceInfoDetail(Structure):
+    _fields_ = [
+        ("FirmwareName", c_char * 32),      # 固件名称字符串
+        ("BuildDate", c_char * 32),         # 固件编译时间字符串
+        ("HardwareVersion", c_int),         # 硬件版本号
+        ("FirmwareVersion", c_int),         # 固件版本号
+        ("SerialNumber", c_int * 3),        # 适配器序列号
+        ("Functions", c_int)                # 适配器当前具备的功能
+    ]
+
 # 定义GPIO端口
 GPIO_PORT0 = 0x06    # GPIO端口0 (对应STM32的PH7引脚)
 GPIO_PORT1 = 0x01    # GPIO端口1
@@ -171,6 +182,37 @@ def main():
         print(f"设备打开失败，错误代码: {open_result}")
         return
 
+    # ===================================================
+    # 函数: USB_GetDeviceInfo
+    # 描述: 获取设备详细信息
+    # 参数:
+    #   serial_param: 设备序列号
+    #   dev_info: 设备信息结构体指针
+    #   func_str: 功能字符串缓冲区
+    # 返回值:
+    #   =0: 成功获取设备信息
+    #   <0: 获取失败，返回错误代码
+    # ===================================================
+    usb_application.USB_GetDeviceInfo.argtypes = [c_char_p, POINTER(DeviceInfoDetail), c_char_p]
+    usb_application.USB_GetDeviceInfo.restype = c_int
+    
+    print("\n获取设备详细信息...")
+    dev_info = DeviceInfoDetail()
+    func_str = create_string_buffer(256)  # 创建功能字符串缓冲区
+    
+    info_result = usb_application.USB_GetDeviceInfo(serial_param, byref(dev_info), func_str)
+    if info_result == 0:
+        print("设备详细信息获取成功:")
+        print(f"  固件名称: {dev_info.FirmwareName.decode('utf-8')}")
+        print(f"  编译时间: {dev_info.BuildDate.decode('utf-8')}")
+        print(f"  硬件版本: 0x{dev_info.HardwareVersion:04X}")
+        print(f"  固件版本: 0x{dev_info.FirmwareVersion:04X}")
+        print(f"  序列号: 0x{dev_info.SerialNumber[0]:08X}-0x{dev_info.SerialNumber[1]:08X}-0x{dev_info.SerialNumber[2]:08X}")
+        print(f"  功能标志: 0x{dev_info.Functions:04X}")
+        print(f"  支持功能: {func_str.value.decode('utf-8')}")
+    else:
+        print(f"获取设备详细信息失败，错误代码: {info_result}")
+
 
     if 0:
         # 选择GPIO端口
@@ -186,7 +228,7 @@ def main():
             print("执行完成")
         else:
             print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-    if 1 :
+    if 0 :
         # 选择GPIO端口
         gpio_index = 8
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)

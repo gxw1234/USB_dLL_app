@@ -56,9 +56,24 @@ int usb_device_init(void) {
         return USB_SUCCESS;
     }
 
-    // 加载libusb DLL
-    debug_printf("尝试加载libusb-1.0.dll");
-    hLibusbDll = LoadLibrary("libusb-1.0.dll");
+    char dll_path[MAX_PATH];
+    char libusb_path[MAX_PATH];
+    HMODULE hCurrentDll = GetModuleHandle("USB_G2X.dll");
+    if (hCurrentDll && GetModuleFileName(hCurrentDll, dll_path, MAX_PATH)) {
+        // 提取目录路径
+        char* last_slash = strrchr(dll_path, '\\');
+        if (last_slash) {
+            *last_slash = '\0';  
+            snprintf(libusb_path, MAX_PATH, "%s\\libusb-1.0.dll", dll_path);
+            debug_printf("尝试从DLL目录加载: %s", libusb_path);
+            hLibusbDll = LoadLibrary(libusb_path);
+        }
+    }
+    
+    if (!hLibusbDll) {
+        debug_printf("从DLL目录加载失败，尝试从当前目录加载libusb-1.0.dll");
+        hLibusbDll = LoadLibrary("libusb-1.0.dll");
+    }
     if (!hLibusbDll) {
         debug_printf("加载libusb-1.0.dll失败, 错误码: %d", GetLastError());
         return USB_ERROR_OTHER;

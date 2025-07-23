@@ -6,6 +6,8 @@
 #define PROTOCOL_IIC        0x02    // IIC协议
 #define PROTOCOL_UART       0x03    // UART协议
 #define PROTOCOL_GPIO       0x04    // GPIO协议
+#define PROTOCOL_RESETSTM32      0x06    // 复位STM32
+
 
 // 通用命令ID定义
 #define CMD_INIT            0x01    // 初始化命令

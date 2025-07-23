@@ -158,6 +158,59 @@ WINAPI int USB_GetDeviceCount(void) {
 }
 
 
+WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* func_str) {
+    if (!dev_info) {
+        debug_printf("获取设备信息失败: 参数无效");
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    debug_printf("获取设备信息: %s", serial ? serial : "默认设备");
+    
+    // 写死的设备信息
+    strcpy(dev_info->FirmwareName, "USB_G2X_Firmware");
+    strcpy(dev_info->BuildDate, "2025-01-23 10:30:00");
+    dev_info->HardwareVersion = 0x0102;  // 硬件版本 1.2
+    dev_info->FirmwareVersion = 0x0305;  // 固件版本 3.5
+    dev_info->SerialNumber[0] = 0x12345678;
+    dev_info->SerialNumber[1] = 0x9ABCDEF0;
+    dev_info->SerialNumber[2] = 0x11223344;
+    dev_info->Functions = 0x000F;  // 支持GPIO、SPI、I2C、Power等功能
+    
+    // 如果提供了func_str参数，根据Functions位标志动态生成功能字符串
+    if (func_str) {
+        char temp_str[256] = {0};
+        int first = 1;
+        
+        if (dev_info->Functions & 0x0001) {  // GPIO功能
+            if (!first) strcat(temp_str, ",");
+            strcat(temp_str, "GPIO");
+            first = 0;
+        }
+        if (dev_info->Functions & 0x0002) {  // SPI功能
+            if (!first) strcat(temp_str, ",");
+            strcat(temp_str, "SPI");
+            first = 0;
+        }
+        if (dev_info->Functions & 0x0004) {  // I2C功能
+            if (!first) strcat(temp_str, ",");
+            strcat(temp_str, "I2C");
+            first = 0;
+        }
+        if (dev_info->Functions & 0x0008) {  // POWER功能
+            if (!first) strcat(temp_str, ",");
+            strcat(temp_str, "POWER");
+            first = 0;
+        }
+        
+        strcpy(func_str, temp_str);
+    }
+    
+    debug_printf("设备信息获取成功: %s, 硬件版本: 0x%04X, 固件版本: 0x%04X", 
+                 dev_info->FirmwareName, dev_info->HardwareVersion, dev_info->FirmwareVersion);
+    
+    return USB_SUCCESS;
+}
+
 WINAPI void USB_SetLogging(int enable) {
     debug_printf("设置USB调试日志: %s", enable ? "启用" : "禁用");
     USB_SetLog(enable);

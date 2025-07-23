@@ -111,7 +111,7 @@ def main():
     print("启用USB调试日志...")
     # 定义函数类型
     # 调用日志开关函数，参数1表示开启
-    usb_application.USB_SetLogging(1)
+    # usb_application.USB_SetLogging(0)
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
@@ -192,12 +192,12 @@ def main():
 
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
         #设置KEY  的GPIO  P7
-        key_gpio_index = 7
+        key_gpio_index = 0x05
         usb_application.GPIO_SetOpenDrain(serial_param, key_gpio_index, 1) #设置为GPIO_MODE_OUTPUT_OD模式  //@param pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
         usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 默认状态 GPIO_PIN_RESET
 
         # 设置复位  的GPIO  P8
-        reset_gpio_index = 8
+        reset_gpio_index = 9
         usb_application.GPIO_SetOutput(serial_param, reset_gpio_index, 1)
         usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)
 
@@ -224,28 +224,28 @@ def main():
 
 
 
-            #测试之前先复位
-            usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)  # 断电
-            print(f'断电')
-            time.sleep(2)
-            usb_application.GPIO_Write(serial_param, reset_gpio_index, 1)  # 上电
-            time.sleep(5)
-            print(f'上电')
+            # #测试之前先复位
+            # usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)  # 断电
+            # print(f'断电')
+            # time.sleep(2)
+            # usb_application.GPIO_Write(serial_param, reset_gpio_index, 1)  # 上电
+            # time.sleep(5)
+            # print(f'上电')
 
-
-            T1 =time.time()
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 0)   #下压
-            time.sleep(0.1)
-            for i in images:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
-            print(f'end_tiem :{time.time() -T1}')
-            time.sleep(0.1)
-            for i in images[:8]:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
-            time.sleep(1)
+            for i in  range(1):
+                T1 =time.time()
+                usb_application.GPIO_Write(serial_param, key_gpio_index, 0)   #下压
+                time.sleep(0.1)
+                for i in images:
+                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                    time.sleep(0.007)
+                usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
+                print(f'end_tiem :{time.time() -T1}')
+                time.sleep(0.1)
+                for i in images[:8]:
+                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                    time.sleep(0.007)
+                time.sleep(6)
         else:
             print(f"SPI初始化失败，错误代码: {1}")
 
