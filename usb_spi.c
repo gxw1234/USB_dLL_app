@@ -162,3 +162,165 @@ int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* p
 
 
 
+
+WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex) {
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
+        debug_printf("SPI索引无效: %d", SPIIndex);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+
+    // 组包协议头
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
+    cmd_header.cmd_id = CMD_QUEUE_STATUS;        // 队列状态查询命令
+    cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
+    cmd_header.param_count = 0;                  // 无参数
+    cmd_header.data_len = 0;                     // 无数据
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
+    if (!send_buffer) {
+        debug_printf("内存分配失败");
+        return SPI_ERROR_OTHER;
+    }
+    
+    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), &end_marker, sizeof(uint32_t));
+    
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    
+    if (ret < 0) {
+        debug_printf("发送SPI队列状态查询命令失败: %d", ret);
+        return SPI_ERROR_IO;
+    }
+    
+    debug_printf("成功发送SPI队列状态查询命令，SPI索引: %d", SPIIndex);
+    
+    // 等待并读取响应
+    Sleep(50); // 等待STM32响应，给足够时间
+    unsigned char response_buffer[1];
+    int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
+    if (actual_read > 0) {
+        debug_printf("队列状态查询成功: %d", response_buffer[0]);
+        return response_buffer[0]; // 返回队列数量
+    }
+    
+    debug_printf("队列状态查询失败，未收到响应");
+    return SPI_ERROR_IO; // 读取失败
+}
+
+
+
+
+
+int SPI_StartQueue(const char* target_serial, int SPIIndex) {
+
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
+        debug_printf("SPI索引无效: %d", SPIIndex);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+
+    // 组包协议头
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
+    cmd_header.cmd_id = CMD_QUEUE_START;        // 队列状态查询命令
+    cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
+    cmd_header.param_count = 0;                  // 无参数
+    cmd_header.data_len = 0;                     // 无数据
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
+    if (!send_buffer) {
+        debug_printf("内存分配失败");
+        return SPI_ERROR_OTHER;
+    }
+    
+    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), &end_marker, sizeof(uint32_t));
+    
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    
+    if (ret < 0) {
+        debug_printf("发送SPI队列状态查询命令失败: %d", ret);
+        return SPI_ERROR_IO;
+    }
+    
+    return SPI_SUCCESS;
+}
+
+
+
+
+int SPI_StopQueue(const char* target_serial, int SPIIndex) {
+
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
+        debug_printf("SPI索引无效: %d", SPIIndex);
+        return SPI_ERROR_INVALID_PARAM;
+    }
+    
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return SPI_ERROR_OTHER;
+    }
+
+    // 组包协议头
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
+    cmd_header.cmd_id = CMD_QUEUE_STOP;        // 队列状态查询命令
+    cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
+    cmd_header.param_count = 0;                  // 无参数
+    cmd_header.data_len = 0;                     // 无数据
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t);
+    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
+    if (!send_buffer) {
+        debug_printf("内存分配失败");
+        return SPI_ERROR_OTHER;
+    }
+    
+    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), &end_marker, sizeof(uint32_t));
+    
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    
+    if (ret < 0) {
+        debug_printf("发送SPI队列状态查询命令失败: %d", ret);
+        return SPI_ERROR_IO;
+    }
+    
+    return SPI_SUCCESS;
+}
