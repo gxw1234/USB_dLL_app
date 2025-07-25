@@ -41,9 +41,10 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
         int ret = usb_device_bulk_transfer(device->libusb_handle, 0x81, temp_buffer, sizeof(temp_buffer), &actual_length, 1000);
         if (ret == 0 && actual_length > 0) {
             parse_and_dispatch_protocol_data(device, temp_buffer, actual_length);
+            debug_printf("读取数据: %d字节", actual_length);
         } else if (ret == -7) {
-            debug_printf("读取超时");
-            Sleep(10);
+            // debug_printf("读取超时");
+            Sleep(1);
         } else {
             debug_printf("读取错误: %d", ret);
             Sleep(100);

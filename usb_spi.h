@@ -52,6 +52,10 @@ WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char
 
 WINAPI int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* pReadBuffer, int ReadLen);
 
+
+WINAPI int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
+
+
 WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex);
 
 WINAPI int SPI_StartQueue(const char* target_serial, int SPIIndex);

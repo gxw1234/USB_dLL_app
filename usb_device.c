@@ -160,7 +160,7 @@ int usb_device_get_device_descriptor(void* dev, usb_device_descriptor* desc) {
     }
     int ret = p_libusb_get_device_descriptor(dev, desc);
     if (ret == 0 && desc) {
-        debug_printf("获取设备描述符: VID=0x%04X, PID=0x%04X", desc->idVendor, desc->idProduct);
+        // debug_printf("获取设备描述符: VID=0x%04X, PID=0x%04X", desc->idVendor, desc->idProduct);
     } else {
         debug_printf("获取设备描述符失败, 错误码: %d", ret);
     }

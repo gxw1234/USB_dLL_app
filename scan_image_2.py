@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 接线
 KEY接： P7
@@ -17,14 +14,15 @@ import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
 from ctypes import *
 
-SPI_FIRSTBIT_LSB  =1
-SPI_FIRSTBIT_MSB =0
+SPI_FIRSTBIT_LSB = 1
+SPI_FIRSTBIT_MSB = 0
 SPI_MODE_MASTER = 1
-SPI_MODE_SLAVE =0
-SPI_POLARITY_HIGH =1
-SPI_POLARITY_LOW =0
-SPI_PHASE_2EDGE =1
-SPI_PHASE_1EDGE =0
+SPI_MODE_SLAVE = 0
+SPI_POLARITY_HIGH = 1
+SPI_POLARITY_LOW = 0
+SPI_PHASE_2EDGE = 1
+SPI_PHASE_1EDGE = 0
+
 
 # 定义设备信息结构体
 class DeviceInfo(Structure):
@@ -74,9 +72,6 @@ def image_sort(data: list):
     return [str(Formatting % i) + image_format for i in im_split]
 
 
-
-
-
 def hex_images(save_path: str) -> list:
     file_dir = save_path
     dir_list = os.listdir(file_dir)
@@ -91,7 +86,6 @@ def hex_images(save_path: str) -> list:
         flat_img_array = img_array.flatten()
         data_list.append((c_ubyte * len(flat_img_array))(*flat_img_array))
     return data_list
-
 
 def main():
     # 当前目录
@@ -116,7 +110,7 @@ def main():
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
     print("调用 USB_ScanDevice 函数...")
-    usb_application.USB_SetLogging(1)
+
     # ===================================================
     # 函数: USB_ScanDevice
     # 描述: 扫描并获取符合条件的USB设备信息
@@ -191,12 +185,16 @@ def main():
         # 定义 SPI_Init 函数参数类型
 
         spi_init_result = usb_application.SPI_Init(serial_param, SPI1_CS0, byref(spi_config))
-        #设置KEY  的GPIO  P7
+        # 设置KEY  的GPIO  P7
         key_gpio_index = 0x05
-        usb_application.GPIO_SetOpenDrain(serial_param, key_gpio_index, 1) #设置为GPIO_MODE_OUTPUT_OD模式  //@param pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
+        usb_application.GPIO_SetOpenDrain(serial_param, key_gpio_index,
+                                          1)  # 设置为GPIO_MODE_OUTPUT_OD模式  //@param pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
         usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 默认状态 GPIO_PIN_RESET
 
-
+        # 设置复位  的GPIO  P8
+        reset_gpio_index = 9
+        usb_application.GPIO_SetOutput(serial_param, reset_gpio_index, 1)
+        usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)
 
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令")
@@ -217,88 +215,29 @@ def main():
             usb_application.SPI_WriteBytes.argtypes = [c_char_p, c_int, POINTER(c_ubyte), c_int]
             usb_application.SPI_WriteBytes.restype = c_int
             path = r'D:\py\autoScan\2\0019_img_0019_out'
-
-            path =r'D:\py\autoScan\2\0019_img_0019_out - 副本'
             images = hex_images(path)
 
+            # #测试之前先复位
+            # usb_application.GPIO_Write(serial_param, reset_gpio_index, 0)  # 断电
+            # print(f'断电')
+            # time.sleep(2)
+            # usb_application.GPIO_Write(serial_param, reset_gpio_index, 1)  # 上电
+            # time.sleep(5)
+            # print(f'上电')
 
-            # 启动队列
-            queue_start_result = usb_application.SPI_StartQueue(serial_param, SPIIndex)
-            if queue_start_result == 0:
-                print("成功启动SPI队列")
-            else:
-                print(f"启动SPI队列失败，错误代码: {queue_start_result}")
-                return
             T1 = time.time()
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 0)   # 下压按键
+            usb_application.GPIO_Write(serial_param, key_gpio_index, 0)  # 下压
             time.sleep(0.1)
-            
-            # 使用队列控制的图像发送
-            image_index = 0
-            total_images = len(images)
-            sent_count = 0
-            print(f"开始发送 {total_images} 张图像...")
-            for i in range(2):
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[image_index], len(images[image_index]))
-                image_index +=1
-            while  True:
-                queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-                print(f'queue_status:{queue_status}')
-                if 0 <= queue_status < 3:
-                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[image_index],
-                                                   len(images[image_index]))
-                    image_index += 1
-                    if  image_index+1 == total_images:
-                        print("end")
-                        break
+            for i in images:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
+            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
+            print(f'end_tiem :{time.time() - T1}')
+            time.sleep(0.1)
+            for i in images[:8]:
+                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                time.sleep(0.007)
 
-
-            # for i in  images[:1]:
-            #     usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, i, len(i))
-            #     for i in range (10):
-            #         queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-            #         print(f'queue_status:{queue_status}')
-
-
-
-
-            # 从第11张开始实现队列控制逻辑：让STM32控制延时
-            consecutive_errors = 0
-            max_consecutive_errors = 5
-            
-            # while image_index < total_images:
-            #     #查他的队列剩余多少
-            #     queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-            #     print(f'queue_status:{queue_status}')
-            #     if queue_status < 0:
-            #         consecutive_errors += 1
-            #         if consecutive_errors >= max_consecutive_errors:
-            #             print(f"连续查询失败{max_consecutive_errors}次，停止发送")
-            #             break
-            #         time.sleep(0.01)  # 减少错误等待时间
-            #         continue
-            #     else:
-            #         consecutive_errors = 0
-            #     if queue_status < 4:
-            #         result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, images[image_index], len(images[image_index]))
-            #         if result == 0:
-            #             sent_count += 1
-            #             image_index += 1
-            #         else:
-            #             print(f"发送图像 {image_index + 1} 失败，错误代码: {result}")
-            #             time.sleep(0.005)
-            #     else:
-            #         time.sleep(0.001)
-
-
-
-
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起按键
-            print(f'发送完成，总用时: {time.time() - T1:.3f}秒，成功发送: {sent_count}/{total_images} 张图像')
-            # 停止队列
-            time.sleep(1)
-            usb_application.SPI_StopQueue(serial_param, SPIIndex)
-            print("SPI队列已停止")
         else:
             print(f"SPI初始化失败，错误代码: {1}")
 
