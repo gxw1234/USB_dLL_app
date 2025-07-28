@@ -211,14 +211,76 @@ WINAPI int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteVal
     debug_printf("--GPIO写入结果: %d", ret);
     return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }
-WINAPI int STM32_reset(const char* target_serial) {
-    debug_printf("STM32_reset");
+
+
+WINAPI int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue) {
+    debug_printf("GPIO_Write开始执行");
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return USB_ERROR_INVALID_PARAM;
     }
 
 
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
+    }
+    
+    // 组包协议头和数据（使用通用参数格式）
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_GPIO;
+    cmd_header.cmd_id = GPIO_SCAN_DIR_WRITE;
+    cmd_header.device_index = (uint8_t)GPIOIndex;
+    cmd_header.param_count = 1;
+    cmd_header.data_len = 0; // 数据部分长度为0，参数通过参数区传递
+    cmd_header.total_packets = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(PARAM_HEADER) + sizeof(uint8_t) + sizeof(uint32_t);
+    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
+    if (!send_buffer) {
+        debug_printf("内存分配失败");
+        return USB_ERROR_OTHER;
+    }
+    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    int pos = sizeof(GENERIC_CMD_HEADER);
+    // 添加参数头和参数体
+    PARAM_HEADER param_header;
+    param_header.param_len = sizeof(uint8_t);
+    memcpy(send_buffer + pos, &param_header, sizeof(PARAM_HEADER));
+    pos += sizeof(PARAM_HEADER);
+    memcpy(send_buffer + pos, &WriteValue, sizeof(uint8_t));
+    pos += sizeof(uint8_t);
+    uint32_t end_marker = CMD_END_MARKER;
+    memcpy(send_buffer + pos, &end_marker, sizeof(uint32_t));
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    // debug_printf("GPIO_Write开始执行, index=%d, value=0x%02X", GPIOIndex, WriteValue);
+    debug_printf("--GPIO_scan_Write   : %d", ret);
+
+    // 给STM32一点时间处理命令和准备响应
+    Sleep(1);
+
+    unsigned char response_buffer[1];
+    int max_loops = 10000000;
+    for (int i = 0; i < max_loops; i++) {
+        int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
+        if (actual_read > 0) {
+            debug_printf("GPIO收到IIC响应");
+            return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
+        }
+    //    Sleep(1);
+    }
+    debug_printf("GPIO没有收到IIC响应");
+    return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
+}
+
+
+
+WINAPI int STM32_reset(const char* target_serial) {
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return USB_ERROR_INVALID_PARAM;
+    }
     int GPIOIndex =1;
     uint8_t WriteValue = 1;
 

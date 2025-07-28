@@ -157,7 +157,22 @@ int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char*
     memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER) + WriteLen, &end_marker, sizeof(uint32_t));
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    return SPI_SUCCESS;
+    unsigned char response_buffer[1];
+    int max_loops = 1000000;
+    for (int i = 0; i < max_loops; i++) {
+        int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
+        if (actual_read > 0) {
+            return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
+        }
+    //    Sleep(1);
+    }
+    
+
+    
+    debug_printf("队列状态查询失败，未收到响应");
+    return SPI_ERROR_IO; // 读取失败
+    
+ 
 }
 
 

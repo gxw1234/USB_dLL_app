@@ -44,7 +44,7 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
             debug_printf("读取数据: %d字节", actual_length);
         } else if (ret == -7) {
             // debug_printf("读取超时");
-            Sleep(1);
+            // Sleep(1);
         } else {
             debug_printf("读取错误: %d", ret);
             Sleep(100);
@@ -91,7 +91,9 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             //释放互斥锁，允许其他等待的线程访问共享资源
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
             
-            // debug_printf("分发SPI数据: %d字节", spi_data_len);
+            debug_printf("分发SPI数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
+        } else {
+            debug_printf("收到非SPI协议数据: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
         }
         
         pos += packet_size;

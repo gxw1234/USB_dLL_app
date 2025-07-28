@@ -32,5 +32,6 @@
 #define GPIO_DIR_OUTPUT_OD  0x02    // 输出开漏
 #define GPIO_DIR_INPUT   0x00    // 输入模式
 #define GPIO_DIR_WRITE   0x03    // 写入
+#define GPIO_SCAN_DIR_WRITE   0x04    // 扫描写入
 
 #endif // USB_PROTOCOL_H 
