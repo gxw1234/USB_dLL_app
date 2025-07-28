@@ -6,19 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// 通用命令包头结构 (已移除end_marker字段)
-typedef struct _GENERIC_CMD_HEADER {
-  uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
-  uint8_t cmd_id;         // 命令ID：初始化/读/写等
-  uint8_t device_index;   // 设备索引
-  uint8_t param_count;    // 参数数量
-  uint16_t data_len;      // 数据部分长度
-  uint16_t total_packets; // 整包总数
-} GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
 
-typedef struct _PARAM_HEADER {
-  uint16_t param_len;     // 参数长度
-} PARAM_HEADER, *PPARAM_HEADER;
 
 extern void debug_printf(const char *format, ...);
 
@@ -51,6 +39,7 @@ int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
     }
     // 组包协议头和数据
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_INIT;               // 初始化命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
@@ -100,6 +89,7 @@ int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWrit
     }
 
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;    // SPI协议
     cmd_header.cmd_id = CMD_WRITE;             // 写数据命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
@@ -139,6 +129,7 @@ int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char*
     }
 
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;    // SPI协议
     cmd_header.cmd_id = CMD_QUEUE_WRITE;             // 写数据命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
@@ -222,6 +213,7 @@ WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex) {
 
     // 组包协议头
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_QUEUE_STATUS;        // 队列状态查询命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
@@ -290,8 +282,9 @@ int SPI_StartQueue(const char* target_serial, int SPIIndex) {
 
     // 组包协议头
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
-    cmd_header.cmd_id = CMD_QUEUE_START;        // 队列状态查询命令
+    cmd_header.cmd_id = CMD_QUEUE_START;        // 队列启动命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
     cmd_header.param_count = 0;                  // 无参数
     cmd_header.data_len = 0;                     // 无数据
@@ -341,8 +334,9 @@ int SPI_StopQueue(const char* target_serial, int SPIIndex) {
 
     // 组包协议头
     GENERIC_CMD_HEADER cmd_header;
+    cmd_header.start_marker = FRAME_START_MARKER;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
-    cmd_header.cmd_id = CMD_QUEUE_STOP;        // 队列状态查询命令
+    cmd_header.cmd_id = CMD_QUEUE_STOP;        // 队列停止命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
     cmd_header.param_count = 0;                  // 无参数
     cmd_header.data_len = 0;                     // 无数据

@@ -12,12 +12,7 @@
 #define CMD_START_READING  0x02    // 开始读取命令
 #define CMD_STOP_READING   0x03    // 停止读取命令
 #define CMD_READ_DATA      0x04    // 读取数据命令
-typedef struct _GENERIC_CMD_HEADER {
-  uint8_t protocol_type;  // 协议类型
-  uint8_t cmd_id;         // 命令ID
-  uint8_t device_index;   // 设备索引
-  uint16_t data_len;      // 数据部分长度
-} GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
+
 
 
 extern void debug_printf(const char *format, ...);

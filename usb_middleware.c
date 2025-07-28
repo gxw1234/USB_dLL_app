@@ -10,14 +10,7 @@
 #include <windows.h>
 #include <time.h>
 
-typedef struct _GENERIC_CMD_HEADER {
-    uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
-    uint8_t cmd_id;         // 命令ID：初始化/读/写等
-    uint8_t device_index;   // 设备索引
-    uint8_t param_count;    // 参数数量
-    uint16_t data_len;      // 数据部分长度
-    uint16_t total_packets; // 整包总数
-} GENERIC_CMD_HEADER;
+
 
 
 #define MAX_DEVICES 10
@@ -41,7 +34,7 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
         int ret = usb_device_bulk_transfer(device->libusb_handle, 0x81, temp_buffer, sizeof(temp_buffer), &actual_length, 1000);
         if (ret == 0 && actual_length > 0) {
             parse_and_dispatch_protocol_data(device, temp_buffer, actual_length);
-            debug_printf("读取数据: %d字节", actual_length);
+            // debug_printf("读取数据: %d字节", actual_length);
         } else if (ret == -7) {
             // debug_printf("读取超时");
             // Sleep(1);
@@ -58,9 +51,29 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
 void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length) {
     int pos = 0;
     while (pos < length) {
-        //检查是否有足够的字节来读取完整的协议头
+        // 寻找帧头标记
+        int frame_start_pos = -1;
+        for (int i = pos; i <= length - (int)sizeof(uint32_t); i++) {
+            uint32_t marker;
+            memcpy(&marker, raw_data + i, sizeof(uint32_t));
+            if (marker == FRAME_START_MARKER) {
+                frame_start_pos = i;
+                break;
+            }
+        }
+        
+        if (frame_start_pos < 0) {
+            // 没找到帧头，数据可能不完整，保存到原始缓冲区
+            EnterCriticalSection(&device->raw_buffer.cs);
+            write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
+            LeaveCriticalSection(&device->raw_buffer.cs);
+            break;
+        }
+        
+        pos = frame_start_pos;
+        
+        // 检查是否有足够的字节来读取完整的协议头
         if (pos + sizeof(GENERIC_CMD_HEADER) > length) {
-
             EnterCriticalSection(&device->raw_buffer.cs);
             write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
             LeaveCriticalSection(&device->raw_buffer.cs);
@@ -68,35 +81,46 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
         }
         
         GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)(raw_data + pos);
-        int packet_size = sizeof(GENERIC_CMD_HEADER) + header->data_len;
+        int expected_packet_size = header->total_packets;
+        
+        // 验证协议头的合理性
+        if (expected_packet_size < sizeof(GENERIC_CMD_HEADER) + sizeof(uint32_t) || 
+            expected_packet_size > length) {
+            debug_printf("Invalid response packet length: %d", expected_packet_size);
+            pos++; // 跳过这个字节，继续寻找下一个帧头
+            continue;
+        }
 
         // 检查是否有足够的字节来读取完整的数据包
-        if (pos + packet_size > length) {
-
+        if (pos + expected_packet_size > length) {
             EnterCriticalSection(&device->raw_buffer.cs);
             write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
             LeaveCriticalSection(&device->raw_buffer.cs);
             break;
         }
-        //检查是否有足够的字节来读取完整的数据包
         
+        // 验证结束标记
+        uint32_t end_marker;
+        memcpy(&end_marker, raw_data + pos + expected_packet_size - sizeof(uint32_t), sizeof(uint32_t));
+        if (end_marker != CMD_END_MARKER) {
+            debug_printf("Invalid response end marker: 0x%08X", end_marker);
+            pos++; // 跳过这个字节，继续寻找下一个帧头
+            continue;
+        }
         if (header->protocol_type == PROTOCOL_SPI) {
-
             unsigned char* spi_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
             int spi_data_len = header->data_len;
-            //获取互斥锁，确保只有一个线程能访问共享资源
+            
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
-            //将SPI数据写入到专用的环形缓冲区中
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_SPI], spi_data, spi_data_len);
-            //释放互斥锁，允许其他等待的线程访问共享资源
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
             
-            debug_printf("分发SPI数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
+            // debug_printf("分发SPI响应数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
         } else {
-            debug_printf("收到非SPI协议数据: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
+            debug_printf("收到非SPI协议响应: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
         }
         
-        pos += packet_size;
+        pos += expected_packet_size;
     }
 }
 
@@ -612,9 +636,9 @@ int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length)
     }
     LeaveCriticalSection(&spi_rb->cs);
     
-    if (to_read > 0) {
-        debug_printf("从SPI缓冲区读取了 %d 字节数据", to_read);
-    }
+    // if (to_read > 0) {
+    //     debug_printf("从SPI缓冲区读取了 %d 字节数据", to_read);
+    // }
     
     return to_read;
 } 

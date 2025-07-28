@@ -18,17 +18,7 @@
 #define CMD_READ            0x03    // 读数据命令
 #define CMD_TRANSFER        0x04    // 读写数据命令
 
-typedef struct _GENERIC_CMD_HEADER {
-  uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
-  uint8_t cmd_id;         // 命令ID：初始化/读/写等
-  uint8_t device_index;   // 设备索引
-  uint8_t param_count;    // 参数数量
-  uint16_t data_len;      // 数据部分长度
-} GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
 
-typedef struct _PARAM_HEADER {
-  uint16_t param_len;     // 参数长度
-} PARAM_HEADER, *PPARAM_HEADER;
 
 extern void debug_printf(const char *format, ...);
 

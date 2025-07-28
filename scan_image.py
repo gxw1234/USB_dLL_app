@@ -116,7 +116,7 @@ def main():
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
     print("调用 USB_ScanDevice 函数...")
-    usb_application.USB_SetLogging(1)
+    # usb_application.USB_SetLogging(1)
     # ===================================================
     # 函数: USB_ScanDevice
     # 描述: 扫描并获取符合条件的USB设备信息
@@ -145,6 +145,7 @@ def main():
     else:
         print("未扫描到设备")
         return
+
 
     print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
     serial_param = devices[0].serial  # 打开第一个设备
@@ -219,6 +220,7 @@ def main():
             path = r'D:\py\autoScan\2\0019_img_0019_out'
 
             # path =r'D:\py\autoScan\2\0019_img_0019_out - 副本'
+            # path =r'D:\py\autoScan\2\1'
             images = hex_images(path)
             # 启动队列
             queue_start_result = usb_application.SPI_StartQueue(serial_param, SPIIndex)
@@ -228,16 +230,17 @@ def main():
                 print(f"启动SPI队列失败，错误代码: {queue_start_result}")
                 return
 
-            usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)   # 下压按键
+            ret =usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)   # 下压按键
+            print(f'GPIO  ret:{ret}')
             # time.sleep(0.1)
             # 使用队列控制的图像发送
             image_index = 0
             total_images = len(images)
             sent_count = 0
-            max_send_count = 92
-            print(f"开始发送 {max_send_count} 张图像...")
+
+            print(f"开始发送 {total_images} 张图像...")
             T1 = time.time()
-            for i in range(max_send_count):
+            for i in range(total_images):
                 max_retries = 3  #重试次数
                 retry_count = 0
                 while retry_count <= max_retries:
@@ -256,6 +259,10 @@ def main():
                 image_index += 1
                 if image_index >= len(images):
                     image_index = 0  # 循环使用图像
+
+
+
+
             usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 1)  # 抬起按键
             print(f'发送完成，总用时: {time.time() - T1:.3f}秒，成功发送: {sent_count}/{total_images} 张图像')
             for i in images[3:]:

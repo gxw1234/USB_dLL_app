@@ -23,8 +23,32 @@
 #define CMD_QUEUE_STOP    0x07    // 队列状态查询命令
 #define CMD_QUEUE_WRITE           0x08    // 写数据命令
 
-//----结束符------------
+//----帧头和结束符------------
+#define FRAME_START_MARKER  0x5AA55AA5 // 帧开始标记
 #define CMD_END_MARKER      0xA5A5A5A5 // 命令包结束符
+
+// 通用命令包头结构 (包含帧头标记)
+typedef struct _GENERIC_CMD_HEADER {
+    uint32_t start_marker;  // 帧开始标记 0x5AA55AA5
+    uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
+    uint8_t cmd_id;         // 命令ID：初始化/读/写等
+    uint8_t device_index;   // 设备索引
+    uint8_t param_count;    // 参数数量
+    uint16_t data_len;      // 数据部分长度
+    uint16_t total_packets; // 整包总数(包括帧头和结束符)
+} __attribute__((packed)) GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
+
+// 参数头结构
+typedef struct _PARAM_HEADER {
+    uint16_t param_len;     // 参数长度
+} PARAM_HEADER, *PPARAM_HEADER;
+
+// 帧头结构
+typedef struct _FRAME_HEADER {
+    uint32_t start_marker;    // 帧开始标记 0x5AA55AA5
+    uint16_t frame_length;    // 整个帧的长度(包括帧头和结束符)
+    uint16_t reserved;        // 保留字段
+} FRAME_HEADER, *PFRAME_HEADER;
 
 
 //----GPIO------------
