@@ -41,7 +41,7 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
         int ret = usb_device_bulk_transfer(device->libusb_handle, 0x81, temp_buffer, sizeof(temp_buffer), &actual_length, 1000);
         if (ret == 0 && actual_length > 0) {
             parse_and_dispatch_protocol_data(device, temp_buffer, actual_length);
-            debug_printf("读取数据: %d字节", actual_length);
+            // debug_printf("读取数据: %d字节", actual_length);
         } else if (ret == -7) {
             // debug_printf("读取超时");
             // Sleep(1);
@@ -91,7 +91,7 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             //释放互斥锁，允许其他等待的线程访问共享资源
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
             
-            debug_printf("分发SPI数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
+            // debug_printf("分发SPI数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
         } else {
             debug_printf("收到非SPI协议数据: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
         }
@@ -612,9 +612,9 @@ int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length)
     }
     LeaveCriticalSection(&spi_rb->cs);
     
-    if (to_read > 0) {
-        debug_printf("从SPI缓冲区读取了 %d 字节数据", to_read);
-    }
+    // if (to_read > 0) {
+    //     debug_printf("从SPI缓冲区读取了 %d 字节数据", to_read);
+    // }
     
     return to_read;
 } 

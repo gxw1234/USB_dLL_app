@@ -162,6 +162,7 @@ int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char*
     for (int i = 0; i < max_loops; i++) {
         int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
         if (actual_read > 0) {
+
             return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
         }
     //    Sleep(1);

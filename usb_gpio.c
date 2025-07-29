@@ -260,12 +260,14 @@ WINAPI int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t Wri
     // 给STM32一点时间处理命令和准备响应
     Sleep(1);
 
+    
+
     unsigned char response_buffer[1];
     int max_loops = 10000000;
     for (int i = 0; i < max_loops; i++) {
         int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
         if (actual_read > 0) {
-            debug_printf("GPIO收到IIC响应");
+            Sleep(10);
             return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
         }
     //    Sleep(1);

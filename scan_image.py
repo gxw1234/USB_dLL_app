@@ -116,7 +116,7 @@ def main():
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
     print("调用 USB_ScanDevice 函数...")
-    usb_application.USB_SetLogging(1)
+    usb_application.USB_SetLogging(0)
     # ===================================================
     # 函数: USB_ScanDevice
     # 描述: 扫描并获取符合条件的USB设备信息
@@ -147,8 +147,7 @@ def main():
         return
 
     print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
-    serial_param = devices[0].serial  # 打开第一个设备
-
+    serial_param = devices[0].serial     #    打开第一个设备
     # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     # ===================================================
     # 函数: USB_OpenDevice
@@ -196,8 +195,6 @@ def main():
         usb_application.GPIO_SetOpenDrain(serial_param, key_gpio_index, 1) #设置为GPIO_MODE_OUTPUT_OD模式  //@param pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
         usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 默认状态 GPIO_PIN_RESET
 
-
-
         if spi_init_result == SPI_SUCCESS:
             print("成功发送SPI初始化命令")
             SPIIndex = SPI1_CS0
@@ -228,6 +225,7 @@ def main():
                 print(f"启动SPI队列失败，错误代码: {queue_start_result}")
                 return
 
+            T1 = time.time()
             usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)   # 下压按键
             # time.sleep(0.1)
             # 使用队列控制的图像发送
@@ -236,7 +234,7 @@ def main():
             sent_count = 0
             max_send_count = 92
             print(f"开始发送 {max_send_count} 张图像...")
-            T1 = time.time()
+
             for i in range(max_send_count):
                 max_retries = 3  #重试次数
                 retry_count = 0
@@ -256,9 +254,9 @@ def main():
                 image_index += 1
                 if image_index >= len(images):
                     image_index = 0  # 循环使用图像
-            usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 1)  # 抬起按键
+            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起按键
             print(f'发送完成，总用时: {time.time() - T1:.3f}秒，成功发送: {sent_count}/{total_images} 张图像')
-            for i in images[3:]:
+            for i in images[-3:]:
                 usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex,i,len(i))
 
             # 停止队列
