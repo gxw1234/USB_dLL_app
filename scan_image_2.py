@@ -1,6 +1,6 @@
 """
 接线
-KEY接： P7
+KEY接： P5
 CS接：  P6
 MO接：  P3
 SCLK接： P4
@@ -224,19 +224,20 @@ def main():
             # usb_application.GPIO_Write(serial_param, reset_gpio_index, 1)  # 上电
             # time.sleep(5)
             # print(f'上电')
-
-            T1 = time.time()
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 0)  # 下压
-            time.sleep(0.1)
-            for i in images:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
-            usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
-            print(f'end_tiem :{time.time() - T1}')
-            time.sleep(0.1)
-            for i in images[:8]:
-                usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
-                time.sleep(0.007)
+            for i in range(1):
+                T1 = time.time()
+                usb_application.GPIO_Write(serial_param, key_gpio_index, 0)  # 下压
+                time.sleep(0.1)
+                for i in images:
+                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                    time.sleep(0.007)
+                usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起
+                print(f'end_tiem :{time.time() - T1}')
+                # time.sleep(0.1)
+                for i in images[:8]:
+                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                    time.sleep(0.007)
+                time.sleep(10)
 
         else:
             print(f"SPI初始化失败，错误代码: {1}")

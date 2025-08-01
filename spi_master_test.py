@@ -248,13 +248,12 @@ def main():
 
 
 
-
-
-            write_buffer_size = 100
+            write_buffer_size = 1000
             write_buffer = (c_ubyte * write_buffer_size)()
             for i in range(write_buffer_size):
                 write_buffer[i] = i
             a =time.time()
+
             write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
             time.sleep(1)
             write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))

@@ -214,7 +214,7 @@ def main():
         print(f"获取设备详细信息失败，错误代码: {info_result}")
 
 
-    if 0:
+    if 1:
         # 选择GPIO端口
         gpio_index = 7
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
