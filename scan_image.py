@@ -255,7 +255,7 @@ def main():
                             retry_count += 1
                             if retry_count <= max_retries:
                                 print(f"图像 {i+1} 发送失败 (ret: {ret})，第 {retry_count} 次重试...")
-                                time.sleep(0.01)  # 重试前等待10ms
+                                # time.sleep(0.01)  # 重试前等待10ms
                             else:
                                 print(f"图像 {i+1} 发送失败，已达到最大重试次数 {max_retries}")
                     image_index += 1

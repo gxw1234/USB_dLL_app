@@ -8,15 +8,10 @@
 
 static int g_log_enabled = 0; // 默认禁用日志
 
-/**
- * @brief 设置日志状态
- * 
- * @param enable 1=开启日志，0=关闭日志
- */
+ //1=开启日志，0=关闭日志
 void USB_SetLog(int enable) {
     g_log_enabled = enable ? 1 : 0;
     if (enable) {
-        // 当启用日志时，立即写入一条记录（无论是否已定义USB_DEBUG_ENABLE）
         FILE* fp = fopen("usb_debug.log", "a");
         if (fp) {
             time_t now = time(NULL);

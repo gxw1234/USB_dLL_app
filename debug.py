@@ -225,6 +225,11 @@ def main():
             # usb_application.GPIO_Write(serial_param, key_gpio_index, 0)
             # usb_application.SPI_StartQueue(serial_param, SPIIndex)
             #
+            # ret = usb_application.SPI_GetQueueStatus(serial_param, 1)
+            #
+            # print(f'查询状态：{ret}')
+            #
+            #
             # ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[1],len(images[1]))
             # print(f'ret:{ret}')
             # ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[1], len(images[1]))
@@ -236,51 +241,52 @@ def main():
             # ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[1], len(images[1]))
             #
             # usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 默认状态 GPIO_PIN_RESET
-            for i in range(1):
-                queue_start_result = usb_application.SPI_StartQueue(serial_param, SPIIndex)
-                if queue_start_result == 0:
-                    print("成功启动SPI队列")
-                else:
-                    print(f"启动SPI队列失败，错误代码: {queue_start_result}")
-                    return
-                T1 = time.time()
-                usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)  # 下压按键
-                # time.sleep(0.1)
-                # 使用队列控制的图像发送
-                image_index = 0
-                total_images = len(images)
-                sent_count = 0
-                max_send_count = 92
-                print(f"开始发送 {max_send_count} 张图像...")
 
-                for i in range(max_send_count):
-                    max_retries = 3  # 重试次数
-                    retry_count = 0
-                    while retry_count <= max_retries:
-                        ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[image_index],
-                                                                   len(images[image_index]))
-                        if ret == 0:
-                            sent_count += 1
-                            break
-                        else:
-                            # 丢帧，校验失败，重试
-                            retry_count += 1
-                            if retry_count <= max_retries:
-                                print(f"图像 {i + 1} 发送失败 (ret: {ret})，第 {retry_count} 次重试...")
-                                time.sleep(0.01)  # 重试前等待10ms
+
+            if 1:
+                for i in range(1):
+                    queue_start_result = usb_application.SPI_StartQueue(serial_param, SPIIndex)
+                    if queue_start_result == 0:
+                        print("成功启动SPI队列")
+                    else:
+                        print(f"启动SPI队列失败，错误代码: {queue_start_result}")
+                        return
+                    T1 = time.time()
+                    usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)  # 下压按键
+                    # time.sleep(0.1)
+                    # 使用队列控制的图像发送
+                    image_index = 0
+                    total_images = len(images)
+                    sent_count = 0
+                    max_send_count = 92
+                    print(f"开始发送 {max_send_count} 张图像...")
+                    for i in range(max_send_count):
+                        max_retries = 3  # 重试次数
+                        retry_count = 0
+                        while retry_count <= max_retries:
+                            ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[image_index],
+                                                                       len(images[image_index]))
+                            if ret == 0:
+                                sent_count += 1
+                                break
                             else:
-                                print(f"图像 {i + 1} 发送失败，已达到最大重试次数 {max_retries}")
-                    image_index += 1
-                    if image_index >= len(images):
-                        image_index = 0  # 循环使用图像
-                usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起按键
-                print(f'发送完成，总用时: {time.time() - T1:.3f}秒，成功发送: {sent_count}/{total_images} 张图像')
-                for i in images[-5:]:
-                    usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                                # 丢帧，校验失败，重试
+                                retry_count += 1
+                                if retry_count <= max_retries:
+                                    print(f"图像 {i + 1} 发送失败 (ret: {ret})，第 {retry_count} 次重试...")
+                                    time.sleep(0.01)  # 重试前等待10ms
+                                else:
+                                    print(f"图像 {i + 1} 发送失败，已达到最大重试次数 {max_retries}")
+                        image_index += 1
+                        if image_index >= len(images):
+                            image_index = 0  # 循环使用图像
+                    usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起按键
+                    print(f'发送完成，总用时: {time.time() - T1:.3f}秒，成功发送: {sent_count}/{total_images} 张图像')
+                    for i in images[-5:]:
+                        usb_application.SPI_WriteBytes(serial_param, SPIIndex, i, len(i))
+                    time.sleep(5)
+                    print("SPI队列已停止")
 
-
-                time.sleep(5)
-                print("SPI队列已停止")
         else:
             print(f"SPI初始化失败，错误代码: {1}")
 

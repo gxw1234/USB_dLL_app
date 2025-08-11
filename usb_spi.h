@@ -7,13 +7,6 @@ extern "C" {
 
 #include "usb_application.h"
 
-// 定义SPI索引
-#define SPI1_CS0    0
-#define SPI1_CS1    1
-#define SPI1_CS2    2
-#define SPI2_CS0    3
-#define SPI2_CS1    4
-#define SPI2_CS2    5
 
 // 定义返回值
 #define SPI_SUCCESS             0    // 成功SPI_SUCCESS

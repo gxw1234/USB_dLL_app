@@ -7,7 +7,7 @@
 #define PROTOCOL_UART       0x03    // UART协议
 #define PROTOCOL_GPIO       0x04    // GPIO协议
 #define PROTOCOL_RESETSTM32      0x06    // 复位STM32
-
+#define PROTOCOL_BOOTLOADER_WRITE_BYTES    0x07    // 写数据命令
 
 // 通用命令ID定义
 #define CMD_INIT            0x01    // 初始化命令
@@ -33,5 +33,11 @@
 #define GPIO_DIR_INPUT   0x00    // 输入模式
 #define GPIO_DIR_WRITE   0x03    // 写入
 #define GPIO_SCAN_DIR_WRITE   0x04    // 扫描写入
+
+//----Bootloader------------
+#define BOOTLOADER_WRITE_BYTES    0x05    // 写数据命令
+#define BOOTLOADER_SWITCH_RUN   0x06    // 切换到RUN模式
+#define BOOTLOADER_SWITCH_BOOT   0x07    // 切换到BOOT模式
+
 
 #endif // USB_PROTOCOL_H 

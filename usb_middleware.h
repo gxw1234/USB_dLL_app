@@ -74,51 +74,12 @@ typedef struct {
 
 // ==================== 设备管理接口 ====================
 
-/**
- * @brief 初始化USB中间层
- * @return int 成功返回0，失败返回错误代码
- */
 int usb_middleware_init(void);
-
-/**
- * @brief 清理USB中间层
- */
 void usb_middleware_cleanup(void);
-
-/**
- * @brief 扫描USB设备
- * @param devices 设备信息数组
- * @param max_devices 最大设备数
- * @return int 扫描到的设备数量
- */
 int usb_middleware_scan_devices(device_info_t* devices, int max_devices);
-
-/**
- * @brief 打开USB设备
- * @param serial 设备序列号，NULL表示打开第一个可用设备
- * @return int 成功返回设备ID(≥0)，失败返回错误代码
- */
 int usb_middleware_open_device(const char* serial);
-
-/**
- * @brief 关闭USB设备
- * @param device_id 设备ID
- * @return int 成功返回0，失败返回错误代码
- */
 int usb_middleware_close_device(int device_id);
-
-/**
- * @brief 根据序列号查找设备ID
- * @param serial 设备序列号
- * @return int 设备ID，未找到返回-1
- */
 int usb_middleware_find_device_by_serial(const char* serial);
-
-/**
- * @brief 检查设备是否已打开
- * @param device_id 设备ID
- * @return int 1=已打开，0=未打开，<0=错误
- */
 int usb_middleware_is_device_open(int device_id);
 
 // ==================== 统一数据读写接口 ====================

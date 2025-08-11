@@ -95,10 +95,7 @@ int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
         debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
+
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
@@ -135,10 +132,7 @@ int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWrit
         debug_printf("参数无效: target_serial=%p, pWriteBuffer=%p, WriteLen=%d", target_serial, pWriteBuffer, WriteLen);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
+
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
@@ -171,10 +165,7 @@ int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char*
         debug_printf("参数无效: target_serial=%p, pWriteBuffer=%p, WriteLen=%d", target_serial, pWriteBuffer, WriteLen);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
+
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
@@ -253,11 +244,7 @@ WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
-    
+
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
@@ -317,10 +304,7 @@ int SPI_StartQueue(const char* target_serial, int SPIIndex) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
+
     
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
@@ -328,7 +312,7 @@ int SPI_StartQueue(const char* target_serial, int SPIIndex) {
         return SPI_ERROR_OTHER;
     }
 
-    // 组包协议头
+    
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_QUEUE_START;        // 队列启动命令
@@ -364,10 +348,7 @@ int SPI_StopQueue(const char* target_serial, int SPIIndex) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return SPI_ERROR_INVALID_PARAM;
     }
-    if (SPIIndex < SPI1_CS0 || SPIIndex > SPI2_CS2) {
-        debug_printf("SPI索引无效: %d", SPIIndex);
-        return SPI_ERROR_INVALID_PARAM;
-    }
+
     
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
@@ -375,7 +356,6 @@ int SPI_StopQueue(const char* target_serial, int SPIIndex) {
         return SPI_ERROR_OTHER;
     }
 
-    // 组包协议头
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_QUEUE_STOP;        // 队列停止命令
