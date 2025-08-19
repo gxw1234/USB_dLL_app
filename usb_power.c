@@ -6,32 +6,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define PROTOCOL_POWER      0x05    // 电源协议
-#define CMD_SET            0x01    // 设置命令
-#define CMD_START_READING  0x02    // 开始读取命令
-#define CMD_STOP_READING   0x03    // 停止读取命令
-#define CMD_READ_DATA      0x04    // 读取数据命令
-typedef struct _GENERIC_CMD_HEADER {
-  uint8_t protocol_type;  // 协议类型
-  uint8_t cmd_id;         // 命令ID
-  uint8_t device_index;   // 设备索引
-  uint16_t data_len;      // 数据部分长度
-} GENERIC_CMD_HEADER, *PGENERIC_CMD_HEADER;
+#include "usb_log.h"
 
 
-extern void debug_printf(const char *format, ...);
+
 
 
 WINAPI int POWER_SetVoltage(const char* target_serial, uint8_t channel, uint16_t voltage_mv) {
-    if (!target_serial) {
-        debug_printf("参数无效: target_serial=%p", target_serial);
-        return POWER_ERROR_INVALID_PARAM;
-    }
-    if (channel != POWER_CHANNEL_1) {
-        debug_printf("电源通道无效: %d", channel);
-        return POWER_ERROR_INVALID_PARAM;
-    }
+
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         device_id = usb_middleware_open_device(target_serial);
@@ -42,17 +24,18 @@ WINAPI int POWER_SetVoltage(const char* target_serial, uint8_t channel, uint16_t
     }
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_POWER;
-    cmd_header.cmd_id = CMD_SET;
+    cmd_header.cmd_id = POWER_CMD_SET_VOLTAGE;
     cmd_header.device_index = channel;
-    cmd_header.data_len = sizeof(uint16_t);
-    int total_len = sizeof(GENERIC_CMD_HEADER) + sizeof(uint16_t);
-    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
-    if (!send_buffer) {
-        debug_printf("内存分配失败");
+    cmd_header.param_count = 1;
+    cmd_header.data_len = 0;
+    
+    unsigned char* send_buffer;
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, &voltage_mv, sizeof(uint16_t), NULL, 0);
+    if (total_len < 0) {
+        debug_printf("构建协议帧失败");
         return POWER_ERROR_OTHER;
     }
-    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
-    memcpy(send_buffer + sizeof(GENERIC_CMD_HEADER), &voltage_mv, sizeof(uint16_t));
+    
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     if (ret < 0) {
@@ -78,16 +61,18 @@ WINAPI int POWER_StartCurrentReading(const char* target_serial, uint8_t channel)
     }
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_POWER;
-    cmd_header.cmd_id = CMD_START_READING;
+    cmd_header.cmd_id = POWER_CMD_START_READING;
     cmd_header.device_index = channel;
+    cmd_header.param_count = 0;
     cmd_header.data_len = 0;
-    int total_len = sizeof(GENERIC_CMD_HEADER);
-    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
-    if (!send_buffer) {
-        debug_printf("内存分配失败");
+    
+    unsigned char* send_buffer;
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, NULL, 0);
+    if (total_len < 0) {
+        debug_printf("构建协议帧失败");
         return POWER_ERROR_OTHER;
     }
-    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     if (ret < 0) {
@@ -114,16 +99,18 @@ WINAPI int POWER_StopCurrentReading(const char* target_serial, uint8_t channel) 
     }
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_POWER;
-    cmd_header.cmd_id = CMD_STOP_READING;
+    cmd_header.cmd_id = POWER_CMD_STOP_READING;
     cmd_header.device_index = channel;
+    cmd_header.param_count = 0;
     cmd_header.data_len = 0;
-    int total_len = sizeof(GENERIC_CMD_HEADER);
-    unsigned char* send_buffer = (unsigned char*)malloc(total_len);
-    if (!send_buffer) {
-        debug_printf("内存分配失败");
+    
+    unsigned char* send_buffer;
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, NULL, 0);
+    if (total_len < 0) {
+        debug_printf("构建协议帧失败");
         return POWER_ERROR_OTHER;
     }
-    memcpy(send_buffer, &cmd_header, sizeof(GENERIC_CMD_HEADER));
+    
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
     if (ret < 0) {
@@ -141,7 +128,41 @@ WINAPI int POWER_ReadCurrentData(const char* target_serial, uint8_t channel, flo
         return POWER_ERROR_INVALID_PARAM;
     }
     
-
-  
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        device_id = usb_middleware_open_device(target_serial);
+        if (device_id < 0) {
+            debug_printf("打开设备失败: %d", device_id);
+            return POWER_ERROR_OTHER;
+        }
+    }
+    
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_POWER;
+    cmd_header.cmd_id = POWER_CMD_READ_CURRENT_DATA;
+    cmd_header.device_index = channel;
+    cmd_header.param_count = 0;
+    cmd_header.data_len = 0;
+    
+    unsigned char* send_buffer;
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, NULL, 0);
+    if (total_len < 0) {
+        debug_printf("构建协议帧失败");
+        return POWER_ERROR_OTHER;
+    }
+    
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    if (ret < 0) {
+        debug_printf("发送读取电流数据命令失败: %d", ret);
+        return POWER_ERROR_IO;
+    }
+    
+    // TODO: 实现从设备读取电流数据的逻辑
+    // 这里需要调用usb_middleware_read_data来接收响应数据
+    // 并解析出float类型的电流值
+    *current_value = 0.0f;  // 临时返回值
+    
+    debug_printf("成功发送读取电流数据命令，通道: %d", channel);
     return POWER_SUCCESS;
 }

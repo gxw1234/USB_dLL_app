@@ -53,7 +53,7 @@ def main():
     #   >=0: 实际扫描到的设备数量
     #   <0: 发生错误，返回错误代码
     # ===================================================
-    result = usb_application.USB_ScanDevice(ctypes.byref(devices), max_devices)
+    result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
 
     print(f"扫描结果: {result}")
     if result > 0:
@@ -123,16 +123,16 @@ def main():
             print(f"设置电压失败，错误代码: {power_result}")
         time.sleep(1)
 
-        power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
-        if power_result == POWER_SUCCESS:
-            print(f"开始读取")
-        else:
-            print(f"开始，错误代码: {power_result}")
-
-        time.sleep(5)
-        buffer_size = 102400
-        buffer = (c_ubyte * buffer_size)()
-        print("尝试读取数据...")
+        # power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
+        # if power_result == POWER_SUCCESS:
+        #     print(f"开始读取")
+        # else:
+        #     print(f"开始，错误代码: {power_result}")
+        #
+        # time.sleep(5)
+        # buffer_size = 102400
+        # buffer = (c_ubyte * buffer_size)()
+        # print("尝试读取数据...")
 
         
         # ===================================================
@@ -148,41 +148,41 @@ def main():
         #   <0: 读取失败，返回错误代码
         # ===================================================
 
-        read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
-        if read_result > 0:
-            print(f"成功读取 {read_result} 字节数据")
-            import struct
-            received_bytes = bytes(buffer[:read_result])
-            data_point_count = read_result // 5
-            print(f"解析到的电流数据:")
-            current_values = []
-            current_types = []
-            for i in range(min(data_point_count, 10)):  
-                try:
-                    base = i * 5 
-                    data_type = received_bytes[base]  
-                    current_value = struct.unpack('f', received_bytes[base+1:base+5])[0]  # 后4个字节是浮点数
-                    current_values.append(current_value)
-                    current_types.append(data_type)
-                    unit = "uA" if data_type == 1 else "mA"  # 1表示微安，0表示毫安
-                    print(f"  电流{i+1}: {current_value:.6f} {unit}")
-                except Exception as e:
-                    print(f"  无法解析第{i+1}个电流值: {str(e)}")
-            print(f"共有{data_point_count}个数据点")
-        elif read_result == 0:
-            print("超时，未读取到数据")
-        else:
-            print(f"读取失败，错误代码: {read_result}")
-
-
-
-        power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
-        if power_result == POWER_SUCCESS:
-
-            print(f"停止读取")
-        else:
-            print(f"停止读取，错误代码: {power_result}")
-
+        # read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
+        # if read_result > 0:
+        #     print(f"成功读取 {read_result} 字节数据")
+        #     import struct
+        #     received_bytes = bytes(buffer[:read_result])
+        #     data_point_count = read_result // 5
+        #     print(f"解析到的电流数据:")
+        #     current_values = []
+        #     current_types = []
+        #     for i in range(min(data_point_count, 10)):
+        #         try:
+        #             base = i * 5
+        #             data_type = received_bytes[base]
+        #             current_value = struct.unpack('f', received_bytes[base+1:base+5])[0]  # 后4个字节是浮点数
+        #             current_values.append(current_value)
+        #             current_types.append(data_type)
+        #             unit = "uA" if data_type == 1 else "mA"  # 1表示微安，0表示毫安
+        #             print(f"  电流{i+1}: {current_value:.6f} {unit}")
+        #         except Exception as e:
+        #             print(f"  无法解析第{i+1}个电流值: {str(e)}")
+        #     print(f"共有{data_point_count}个数据点")
+        # elif read_result == 0:
+        #     print("超时，未读取到数据")
+        # else:
+        #     print(f"读取失败，错误代码: {read_result}")
+        #
+        #
+        #
+        # power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
+        # if power_result == POWER_SUCCESS:
+        #
+        #     print(f"停止读取")
+        # else:
+        #     print(f"停止读取，错误代码: {power_result}")
+        #
 
 
         # ===================================================

@@ -163,10 +163,7 @@ WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* fu
         debug_printf("获取设备信息失败: 参数无效");
         return USB_ERROR_INVALID_PARAM;
     }
-    
     debug_printf("获取设备信息: %s", serial ? serial : "默认设备");
-    
-    // 写死的设备信息
     strcpy(dev_info->FirmwareName, "USB_G2X_Firmware");
     strcpy(dev_info->BuildDate, "2025-01-23 10:30:00");
     dev_info->HardwareVersion = 0x0102;  // 硬件版本 1.2
@@ -201,7 +198,6 @@ WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* fu
             strcat(temp_str, "POWER");
             first = 0;
         }
-        
         strcpy(func_str, temp_str);
     }
     
@@ -210,6 +206,12 @@ WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* fu
     
     return USB_SUCCESS;
 }
+
+
+
+
+
+
 
 WINAPI void USB_SetLogging(int enable) {
     debug_printf("设置USB调试日志: %s", enable ? "启用" : "禁用");

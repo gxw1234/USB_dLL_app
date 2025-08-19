@@ -18,7 +18,6 @@ extern "C" {
 #define USB_ERROR_TIMEOUT      -7    // 超时错误
 #define USB_ERROR_OTHER        -99   // 其他错误
 
-// Windows API导出宏
 #ifdef _WIN32
     #ifdef BUILDING_DLL
         #define WINAPI __declspec(dllexport)

@@ -154,11 +154,7 @@ def main():
     
 
     
-    # 测试USB通信是否正常工作
-    print("\n测试USB调试日志是否工作...")
-    usb_application.USB_SetLogging(0)  # 显式开启日志
-    print("USB调试日志已开启\n")
-    
+
 
     
     # ==================================================
@@ -195,11 +191,9 @@ def main():
     # ===================================================
     usb_application.USB_GetDeviceInfo.argtypes = [c_char_p, POINTER(DeviceInfoDetail), c_char_p]
     usb_application.USB_GetDeviceInfo.restype = c_int
-    
     print("\n获取设备详细信息...")
     dev_info = DeviceInfoDetail()
     func_str = create_string_buffer(256)  # 创建功能字符串缓冲区
-    
     info_result = usb_application.USB_GetDeviceInfo(serial_param, byref(dev_info), func_str)
     if info_result == 0:
         print("设备详细信息获取成功:")
@@ -214,7 +208,7 @@ def main():
         print(f"获取设备详细信息失败，错误代码: {info_result}")
 
 
-    if 1:
+    if 0:
         # 选择GPIO端口
         gpio_index = 7
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
@@ -245,9 +239,14 @@ def main():
                 print(f'上电')
         else:
             print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-
-
-
+    if 1:
+        POWER_CHANNEL_1 = 0x01
+        POWER_SUCCESS = 0
+        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 186)
+        if power_result == POWER_SUCCESS:
+            print(f"成功发送设置电压命令，")
+        else:
+            print(f"设置电压失败，错误代码: {power_result}")
 
 
     # print("\n关闭设备...")

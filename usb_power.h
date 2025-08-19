@@ -14,16 +14,7 @@ extern "C" {
 #define POWER_ERROR_IO          -2  // IO错误
 #define POWER_ERROR_OTHER       -3  // 其他错误
 
-
-#define POWER_CMD_SET_VOLTAGE   0x01  // 设置电压命令
-#define POWER_CMD_START_CURRENT_READING 0x02  // 开始读取电流命令
-#define POWER_CMD_STOP_CURRENT_READING  0x03  // 停止读取电流命令
-#define POWER_CMD_READ_CURRENT_DATA     0x04  // 读取电流数据命令
-
-
 #define POWER_CHANNEL_1         0x01  // 电源通道1
-#define POWER_CHANNEL_UA        0x02  // 微安电流通道
-#define POWER_CHANNEL_MA        0x03  // 毫安电流通道
 
 
 typedef struct _VOLTAGE_CONFIG {

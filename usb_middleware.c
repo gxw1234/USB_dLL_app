@@ -9,16 +9,7 @@
 #include <string.h>
 #include <windows.h>
 #include <time.h>
-
-typedef struct _GENERIC_CMD_HEADER {
-    uint8_t protocol_type;  // 协议类型：SPI/IIC/UART等
-    uint8_t cmd_id;         // 命令ID：初始化/读/写等
-    uint8_t device_index;   // 设备索引
-    uint8_t param_count;    // 参数数量
-    uint16_t data_len;      // 数据部分长度
-    uint16_t total_packets; // 整包总数
-} GENERIC_CMD_HEADER;
-
+#include "usb_log.h"
 
 #define MAX_DEVICES 10
 #define SPI_BUFFER_SIZE (10 * 1024 * 1024)    // SPI专用缓冲区
@@ -31,7 +22,6 @@ static int g_device_count = 0;
 static int g_next_device_id = 0;
 static int g_initialized = 0;
 
-extern void debug_printf(const char *format, ...);
 
 static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
     device_handle_t* device = (device_handle_t*)lpParameter;
@@ -53,7 +43,6 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
 
     return 0;
 }
-
 
 void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length) {
     int pos = 0;
@@ -120,7 +109,6 @@ void write_to_ring_buffer(ring_buffer_t* rb, unsigned char* data, int length) {
 
 int usb_middleware_init(void) {
     if (g_initialized) {
-        debug_printf("USB中间层已经初始化");
         return USB_SUCCESS;
     }
     

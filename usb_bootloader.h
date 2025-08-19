@@ -26,7 +26,11 @@ typedef struct _CMD_HEADER {
 } CMD_HEADER, *PCMD_HEADER;
 
 
+WINAPI int Bootloader_StartWrite(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
 WINAPI int Bootloader_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
+WINAPI int Bootloader_Reset(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
+WINAPI int Bootloader_SwitchRun(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
+WINAPI int Bootloader_SwitchBoot(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
 
 
 
