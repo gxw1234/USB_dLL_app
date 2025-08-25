@@ -39,15 +39,11 @@ typedef struct _CMD_HEADER {
 
 WINAPI int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig);
 
-
 WINAPI int SPI_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
-
 
 WINAPI int SPI_SlaveReadBytes(const char* target_serial, int SPIIndex, unsigned char* pReadBuffer, int ReadLen);
 
-
 WINAPI int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char* pWriteBuffer, int WriteLen);
-
 
 WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex);
 

@@ -69,7 +69,7 @@ typedef struct _GENERIC_CMD_HEADER {
   
 
   typedef struct _PARAM_HEADER {
-    uint16_t param_len;     // 参数长度
+    uint16_t param_len;     
   } PARAM_HEADER, *PPARAM_HEADER;
   
 // 组包

@@ -10,7 +10,6 @@ int build_protocol_frame(unsigned char** buffer, GENERIC_CMD_HEADER* cmd_header,
                         void* param_data, size_t param_len, 
                         void* data_payload, size_t data_len) {
 
-    // 计算total_packets：只包含协议数据部分，不包含帧头和帧尾
     cmd_header->total_packets = sizeof(GENERIC_CMD_HEADER);
     if (param_len > 0) {
         cmd_header->total_packets += sizeof(PARAM_HEADER) + param_len;

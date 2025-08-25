@@ -146,7 +146,6 @@ def main():
     #   <0: 发生错误，返回错误代码
     # ===================================================
     result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
-
     print(f"扫描结果: {result}")
     if result > 0:
         print(f"找到 {result} 个USB设备:")
@@ -248,15 +247,15 @@ def main():
 
 
 
-            write_buffer_size = 1000
+            write_buffer_size = 10
             write_buffer = (c_ubyte * write_buffer_size)()
             for i in range(write_buffer_size):
                 write_buffer[i] = i
             a =time.time()
 
             write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
-            time.sleep(1)
-            write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
+            # time.sleep(1)
+            # write_result = usb_application.SPI_WriteBytes(serial_param, SPIIndex, write_buffer, len(write_buffer))
 
             print(f'temi{time.time()  -a}')
             if write_result == SPI_SUCCESS:

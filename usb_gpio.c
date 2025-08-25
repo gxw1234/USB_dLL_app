@@ -168,7 +168,7 @@ WINAPI int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t Wri
     return (ret >= 0) ? USB_SUCCESS : USB_ERROR_OTHER;
 }
 
-WINAPI int STM32_reset(const char* target_serial) {
+WINAPI int USB_device_reset(const char* target_serial) {
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return USB_ERROR_INVALID_PARAM;

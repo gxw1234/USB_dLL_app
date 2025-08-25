@@ -7,10 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 
-#define GPIO_DIR_OUTPUT  0x01    // 输出模式
-#define GPIO_DIR_OUTPUT_OD  0x02    // 输出开漏
-#define GPIO_DIR_INPUT   0x00    // 输入模式
-#define GPIO_DIR_WRITE   0x03    // 写入
+
 
 //设置为输出模式
  //pull_mode 上拉下拉模式：0=无上拉下拉，1=上拉，2=下拉
@@ -27,12 +24,11 @@ int GPIO_SetInput(const char* target_serial, int GPIOIndex, uint8_t pull_mode);
 //普通写入GPIO
 int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue);
 
-//扫描写入GPIO
+//扫描写入GPIO，需要等待IIC响应，才返回
 int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue);
 
-
 //复位STM32
-int STM32_reset(const char* target_serial);
+int USB_device_reset(const char* target_serial);
 
 
 #ifdef __cplusplus

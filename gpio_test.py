@@ -85,7 +85,6 @@ def main():
     #   <0: 发生错误，返回错误代码
     # ===================================================
     result = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
-    
     if result < 0:
         print(f"扫描设备失败，错误代码: {result}")
         return
@@ -222,7 +221,7 @@ def main():
             print("执行完成")
         else:
             print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-    if 0 :
+    if 1 :
         # 选择GPIO端口
         gpio_index = 8
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
@@ -239,7 +238,7 @@ def main():
                 print(f'上电')
         else:
             print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-    if 1:
+    if 0:
         POWER_CHANNEL_1 = 0x01
         POWER_SUCCESS = 0
         power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 186)
@@ -247,6 +246,7 @@ def main():
             print(f"成功发送设置电压命令，")
         else:
             print(f"设置电压失败，错误代码: {power_result}")
+
 
 
     # print("\n关闭设备...")
