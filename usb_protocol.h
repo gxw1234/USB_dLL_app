@@ -49,12 +49,27 @@
 #define BOOTLOADER_SWITCH_BOOT   0x07    // 切换到BOOT模式
 #define BOOTLOADER_RESET   0x08    // 复位
 
+#define GPIO_SCAN_MODE_WRITE   0x04    // IIC
+
 
 //----Power------------
 #define POWER_CMD_SET_VOLTAGE   0x01  // 设置电压命令
 #define POWER_CMD_START_READING 0x02  // 开始读取电流命令
 #define POWER_CMD_STOP_READING  0x03  // 停止读取电流命令
 #define POWER_CMD_READ_CURRENT_DATA     0x04  // 读取电流数据命令
+
+
+//ST发送PC接收
+// 协议类型定义  protocol_type
+
+#define PROTOCOL_STATUS    0x09    
+
+
+
+//CMD_ID
+#define GET_STATUS 01
+
+
 
 
 

@@ -109,26 +109,24 @@ int SPI_Queue_WriteBytes(const char* target_serial, int SPIIndex, unsigned char*
     }
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-
-
-
-    unsigned char response_buffer[1];
+    // 使用专用状态缓冲区读取响应，支持完整协议头
+    unsigned char response_buffer[16];  // 足够容纳完整状态响应
     int max_loops = 1000000;
     for (int i = 0; i < max_loops; i++) {
-        int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
-        if (actual_read > 0) {
-
-            return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
+        int actual_read = usb_middleware_read_status_data(device_id, response_buffer, sizeof(response_buffer));
+        
+        if (actual_read >= sizeof(GENERIC_CMD_HEADER) + 1) {  // 至少包含协议头+状态数据
+            GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)response_buffer;
+            if (header->protocol_type == PROTOCOL_STATUS && 
+                header->cmd_id == CMD_QUEUE_WRITE ) {
+                uint8_t queue_status = response_buffer[sizeof(GENERIC_CMD_HEADER)];
+                return queue_status;
+            }
         }
-    //    Sleep(1);
     }
     
-
-    
-    debug_printf("队列状态查询失败，未收到响应");
+    debug_printf("队列写入失败，未收到响应");
     return SPI_ERROR_IO; // 读取失败
-    
- 
 }
 
 
@@ -196,20 +194,22 @@ WINAPI int SPI_GetQueueStatus(const char* target_serial, int SPIIndex) {
         return SPI_ERROR_IO;
     }
     
-    debug_printf("成功发送SPI队列状态查询命令，SPI索引: %d", SPIIndex);
-    
-    unsigned char response_buffer[1];
-    int max_loops = 100000;
-    for (int i = 0; i < max_loops; i++) {
-        int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
-        if (actual_read > 0) {
-            return response_buffer[0]; // 有数据立即返回，无数据则返回-1  读取10000次
-        }
-    //    Sleep(1);
-        
-    }
+    // debug_printf("成功发送SPI队列状态查询命令，SPI索引: %d", SPIIndex);
     
 
+    unsigned char response_buffer[16];  
+    int max_loops = 1000000;
+    for (int i = 0; i < max_loops; i++) {
+        int actual_read = usb_middleware_read_status_data(device_id, response_buffer, sizeof(response_buffer));
+        if (actual_read >= sizeof(GENERIC_CMD_HEADER) + 1) {  // 至少包含协议头+状态数据
+            GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)response_buffer;
+            if (header->protocol_type == PROTOCOL_STATUS && 
+                header->cmd_id == CMD_QUEUE_STATUS ) {
+                uint8_t queue_status = response_buffer[sizeof(GENERIC_CMD_HEADER)];
+                return queue_status;
+            }
+        }
+    }
     
     debug_printf("队列状态查询失败，未收到响应");
     return SPI_ERROR_IO; // 读取失败
@@ -248,10 +248,8 @@ int SPI_StartQueue(const char* target_serial, int SPIIndex) {
     if (total_len < 0) {
         return SPI_ERROR_OTHER;
     }
-    
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    
     if (ret < 0) {
         debug_printf("发送SPI队列状态查询命令失败: %d", ret);
         return SPI_ERROR_IO;
@@ -269,21 +267,17 @@ int SPI_StopQueue(const char* target_serial, int SPIIndex) {
         debug_printf("参数无效: target_serial=%p", target_serial);
         return SPI_ERROR_INVALID_PARAM;
     }
-
-    
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);
         return SPI_ERROR_OTHER;
     }
-
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_SPI;     // SPI协议
     cmd_header.cmd_id = CMD_QUEUE_STOP;        // 队列停止命令
     cmd_header.device_index = (uint8_t)SPIIndex; // 设备索引
     cmd_header.param_count = 0;                  // 无参数
     cmd_header.data_len = 0;                     // 无数据
-
     unsigned char* send_buffer;
     int total_len = build_protocol_frame(&send_buffer, &cmd_header, 
                                    NULL, 0, 
@@ -291,14 +285,11 @@ int SPI_StopQueue(const char* target_serial, int SPIIndex) {
     if (total_len < 0) {
         return SPI_ERROR_OTHER;
     }
-    
     int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
     free(send_buffer);
-    
     if (ret < 0) {
         debug_printf("发送SPI队列状态查询命令失败: %d", ret);
         return SPI_ERROR_IO;
-    }
-    
+    }    
     return SPI_SUCCESS;
 }

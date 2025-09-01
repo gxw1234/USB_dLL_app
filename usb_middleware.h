@@ -17,7 +17,8 @@ extern "C" {
 
 #define PROTOCOL_SPI        0x01    // SPI协议
 #define PROTOCOL_POWER      0x05    // 电源协议
-#define MAX_PROTOCOL_TYPES  6       // 最大协议类型数量(0=未使用, 1=SPI, 5=POWER)
+#define PROTOCOL_STATUS     0x09    // 状态响应协议
+#define MAX_PROTOCOL_TYPES  10      // 最大协议类型数量(0=未使用, 1=SPI, 5=POWER, 9=STATUS)
 
 typedef struct {
     unsigned char* buffer;     // 缓冲区指针
@@ -90,6 +91,8 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length);
 
 int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length);
 
+// 专用状态数据读取函数
+int usb_middleware_read_status_data(int device_id, unsigned char* data, int length);
 
 int usb_middleware_write_data(int device_id, unsigned char* data, int length);
 

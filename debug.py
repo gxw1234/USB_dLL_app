@@ -131,7 +131,7 @@ def main():
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
     print("调用 USB_ScanDevice 函数...")
-    usb_application.USB_SetLogging(0)
+    usb_application.USB_SetLogging(1)
     # ===================================================
     # 函数: USB_ScanDevice
     # 描述: 扫描并获取符合条件的USB设备信息
@@ -236,47 +236,67 @@ def main():
             # 启动队列
 
             usb_application.SPI_StartQueue(serial_param, SPIIndex)
+            # queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
+            # print(f"当前队列状态: {queue_status}")
+            # usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[1], len(images[1]))
+            # ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[i], len(images[i]))
+            # print(f'ret:{ret}')
+
+            # ret = usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)  # 用同步接口，下压之接等IIC回复才退出
+            # print(f'下压状态：{ret}')
             if 1:
-                for  i in range(1000):
+
+                Count =0
+                for  i in range(1000000):
+                    Count+1
                     print(f'下压')
+                    # ret = usb_application.GPIO_Write(serial_param, key_gpio_index, 0)  #用同步接口，下压之接等IIC回复才退出
+                    # time.sleep(0.2)
                     ret = usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)  #用同步接口，下压之接等IIC回复才退出
                     print(f'下压状态：{ret}')
-                    # time.sleep(0.5)
-                    # 先发送8张图像
-                    print("先发送前8张图像...  因为有队列可以存十张图，先让队列有数据一直传")
+                    # "先发送前8张图像...  因为有队列可以存十张图，先让队列有数据一直传")
                     for i in range(min(8, len(images))):
                         usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[i], len(images[i]))
                     # 发送剩余的图像
                     remaining_images = len(images) - 8
                     if remaining_images > 0:
-                        print(f"开始发送剩余的 {remaining_images} 张图像...")
+                        # print(f"开始发送剩余的 {remaining_images} 张图像...")
                         for i in range(8, len(images)):
                             # 检查队列状态，如果大于8就等待
                             while True:
                                 queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-                                print(f"当前队列状态: {queue_status}")
+                                # print(f"当前队列状态: {queue_status}")
                                 if 0 <= queue_status <= 7:
                                     break  # 如果队列状态在 0 到 7 之间，退出循环
                                 elif queue_status > 7:
                                     time.sleep(0.003)  # 如果队列状态大于 7，等待 3ms 再次检查
                             # 发送图像
                             ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[i], len(images[i]))
-                            if ret == 0:
-                                print(f"成功发送第 {i+1} 张图像")
-                            else:
-                                print(f"发送第 {i+1} 张图像失败，错误代码: {ret}")
+                            # if ret == 0:
+                            #     print(f"成功发送第 {i+1} 张图像")
+                            # else:
+                            #     print(f"发送第 {i+1} 张图像失败，错误代码: {ret}")
                     # 等待队列完全清空后再抬起按键
                     print("等待队列完全清空...")
+                    previous_status = -1  # 初始化上一个状态为-1，确保第一次循环不会直接退出
                     while True:
                         queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-                        if queue_status == 0:
+                        if queue_status == 0 and previous_status == 0:
                             break
-                    time.sleep(0.01)
+                        previous_status = queue_status
+
                     usb_application.GPIO_Write(serial_param, key_gpio_index, 1)  # 抬起按键
                     print("队列已清空，所有图像发送完成")
+                    # time.sleep(0.01)
                     for i in images[-5:]:
                         usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, i, len(i))
-                    time.sleep(15)
+
+                    if Count % 2 == 0:
+                        time.sleep(10)
+                    else:
+                        time.sleep(2)
+
+
             if 0:
                 write_buffer_size = 240*96
                 write_buffer = (c_ubyte * write_buffer_size)()

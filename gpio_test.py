@@ -221,7 +221,7 @@ def main():
             print("执行完成")
         else:
             print(f"设置GPIO为输出模式失败，错误代码: {set_output_result}")
-    if 1 :
+    if 0 :
         # 选择GPIO端口
         gpio_index = 8
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
