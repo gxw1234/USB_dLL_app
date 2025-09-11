@@ -122,16 +122,12 @@ def main():
     # 加载DLL
     usb_application = ctypes.CDLL(dll_path)
     print("成功加载DLL")
-    # 启用日志功能（可选）
-    print("启用USB调试日志...")
-    # 定义函数类型
-    # 调用日志开关函数，参数1表示开启
-    # usb_application.USB_SetLogging(0)
+
     # 测试设备扫描
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
     print("调用 USB_ScanDevice 函数...")
-    usb_application.USB_SetLogging(1)
+
     # ===================================================
     # 函数: USB_ScanDevice
     # 描述: 扫描并获取符合条件的USB设备信息
@@ -162,6 +158,12 @@ def main():
 
     print(f"尝试打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
     serial_param = devices[0].serial  # 打开第一个设备
+
+
+
+
+
+
     # serial_param ="xxxxxxx".encode('utf-8')   #如果已知设备的序列号
     # ===================================================
     # 函数: USB_OpenDevice
@@ -172,6 +174,8 @@ def main():
     #   >=0: 成功打开设备，返回设备句柄
     #   <0: 打开失败，返回错误代码
     # ===================================================
+
+
     handle = usb_application.USB_OpenDevice(serial_param)
     time.sleep(1)
     if handle >= 0:
@@ -235,19 +239,31 @@ def main():
             images = hex_images(path)
             # 启动队列
 
+            # ===================================================
+            # SPI图像传输队列流程说明:
+            # 1. 启动SPI队列，队列可缓存10张图像
+            # 2. GPIO下压操作，等待IIC响应确认后再开始图像传输
+            # 3. 先发送8张图像到队列，让队列有数据持续传输
+            # 4. 查询队列状态，如果剩余图像少于7张，继续补充图像
+            # 5. 发送完成后再次查询队列状态确认传输完成
+            # 
+            # 队列工作原理:
+            # - 队列容量: 10张图像 (MAX_QUEUE_SIZE = 10)
+            # - GPIO同步: 启动队列后执行GPIO_scan_Write下压操作，等待IIC响应确认
+            # - 预填充: 先发送8张图像确保队列有足够数据
+            # - 动态补充: 当队列剩余<7张时补充新图像
+            # - 状态监控: 通过SPI_GetQueueStatus查询队列状态
+            # - 固定延时: 每张图像传输完成后有硬件定时器做精准的延时
+            #   这个延时确保图像数据完全处理完成，避免数据冲突
+            # ===================================================
+            # 启动队列
             usb_application.SPI_StartQueue(serial_param, SPIIndex)
-            # queue_status = usb_application.SPI_GetQueueStatus(serial_param, SPIIndex)
-            # print(f"当前队列状态: {queue_status}")
-            # usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[1], len(images[1]))
-            # ret = usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, images[i], len(images[i]))
-            # print(f'ret:{ret}')
-
             # ret = usb_application.GPIO_scan_Write(serial_param, key_gpio_index, 0)  # 用同步接口，下压之接等IIC回复才退出
             # print(f'下压状态：{ret}')
             if 1:
 
                 Count =0
-                for  i in range(1000000):
+                for  i in range(1000):
                     Count+1
                     print(f'下压')
                     # ret = usb_application.GPIO_Write(serial_param, key_gpio_index, 0)  #用同步接口，下压之接等IIC回复才退出
@@ -290,11 +306,12 @@ def main():
                     # time.sleep(0.01)
                     for i in images[-5:]:
                         usb_application.SPI_Queue_WriteBytes(serial_param, SPIIndex, i, len(i))
-
                     if Count % 2 == 0:
                         time.sleep(10)
+                        print("11111")
                     else:
                         time.sleep(2)
+                        print("22222222")
 
 
             if 0:

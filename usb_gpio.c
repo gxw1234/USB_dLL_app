@@ -151,42 +151,26 @@ WINAPI int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t Wri
     if (total_len < 0) {
         return USB_ERROR_OTHER;
     }
-    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);  //下压
     free(send_buffer);
     debug_printf("--GPIO_scan_Write: %d", ret);
-    Sleep(1);
-
-
-
-    // unsigned char response_buffer[1];
-    // int max_loops = 10000000;
-    // for (int i = 0; i < max_loops; i++) {
-    //     int actual_read = usb_middleware_read_spi_data(device_id, response_buffer, 1);
-    //     if (actual_read > 0) {
-    //         Sleep(20);
-    //         return response_buffer[0];
-    //     }
-    // }
-
-
-
     unsigned char response_buffer[16];  
-    int max_loops = 1000000;
-    Sleep(10);
+    int max_loops =2000;
+
+    //下压之后等IIC回复，通过USB读取状态
     for (int i = 0; i < max_loops; i++) {
         int actual_read = usb_middleware_read_status_data(device_id, response_buffer, sizeof(response_buffer));
-        if (actual_read >= sizeof(GENERIC_CMD_HEADER) + 1) {  // 至少包含协议头+状态数据
+        if (actual_read >= sizeof(GENERIC_CMD_HEADER) + 1) {  // 包含协议头+状态数据
             GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)response_buffer;
             if (header->protocol_type == PROTOCOL_STATUS && 
                 header->cmd_id == GPIO_SCAN_MODE_WRITE ) {
                 uint8_t queue_status = response_buffer[sizeof(GENERIC_CMD_HEADER)];
+                Sleep(50);
                 return queue_status;
             }
         }
+        Sleep(1);
     }
-
-
-
 
     debug_printf("GPIO没有收到IIC响应");
     return USB_ERROR_OTHER;

@@ -13,6 +13,8 @@
 #define PROTOCOL_RESETSTM32      0x06    
 #define PROTOCOL_BOOTLOADER_WRITE_BYTES    0x07    
 #define PROTOCOL_GET_FIRMWARE_INFO    0x08    
+#define PROTOCOL_STATUS    0x09    // 专用状态响应协议
+#define PROTOCOL_AUDIO      0x0A    // 音频协议
 
 
 //------------cmd_id以下都是命令ID-------------------------
@@ -58,11 +60,17 @@
 #define POWER_CMD_STOP_READING  0x03  // 停止读取电流命令
 #define POWER_CMD_READ_CURRENT_DATA     0x04  // 读取电流数据命令
 
+//----Audio I2S------------
+#define AUDIO_CMD_INIT      0x01  // 初始化命令
+#define AUDIO_CMD_PLAY      0x02  // 播放命令
+#define AUDIO_CMD_STOP      0x03  // 停止命令
+#define AUDIO_CMD_START     0x04  // 启动队列命令
+#define AUDIO_CMD_STATUS    0x05  // 状态查询命令
+#define AUDIO_CMD_VOLUME    0x06  // 音量控制命令
+
 
 //ST发送PC接收
 // 协议类型定义  protocol_type
-
-#define PROTOCOL_STATUS    0x09    
 
 
 
