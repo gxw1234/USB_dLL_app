@@ -31,35 +31,28 @@ extern "C" {
 // ==================== 设备信息结构体 ====================
 
 typedef struct _DEVICE_INFO {
-    char    FirmwareName[32];       // 固件名称字符串
-    char    BuildDate[32];          // 固件编译时间字符串
+    char    DllName[32];            // DLL名称字符串
+    char    DllBuildDate[32];       // DLL编译时间字符串
+    int     DllVersion;             // DLL版本号
+    char    FirmwareName[32];       // 设备固件名称字符串
+    char    FirmwareBuildDate[32];  // 设备固件编译时间字符串
     int     HardwareVersion;        // 硬件版本号
-    int     FirmwareVersion;        // 固件版本号
+    int     FirmwareVersion;        // 设备固件版本号
     int     SerialNumber[3];        // 适配器序列号
     int     Functions;              // 适配器当前具备的功能
 } DEVICE_INFO, *PDEVICE_INFO;
 
+
+
 // ==================== 设备管理接口 ====================
-
-
-WINAPI int USB_Init(void);
-WINAPI void USB_Exit(void);
-WINAPI int USB_ScanDevices(device_info_t* devices, int max_devices);
-WINAPI int USB_OpenDevice(const char* serial);
-WINAPI int USB_CloseDevice(const char* serial);
-
-WINAPI int USB_FindDeviceBySerial(const char* serial);
-
-WINAPI int USB_IsDeviceOpen(int device_id);
-
-WINAPI int USB_GetDeviceCount(void);
-
-WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* func_str);
-
-WINAPI void USB_SetLogging(int enable);
-
-
-
+WINAPI int USB_ScanDevices(device_info_t* devices, int max_devices); // 扫描设备
+WINAPI int USB_OpenDevice(const char* serial); // 打开设备
+WINAPI int USB_CloseDevice(const char* serial); // 关闭设备
+WINAPI int USB_FindDeviceBySerial(const char* serial); // 通过序列号查找设备
+WINAPI int USB_IsDeviceOpen(int device_id); // 检查设备是否打开
+WINAPI int USB_GetDeviceCount(void); // 获取设备数量
+WINAPI int USB_GetDeviceInfo(const char* serial, PDEVICE_INFO dev_info, char* func_str); // 获取设备信息
+WINAPI void USB_SetLogging(int enable);  // 设置日志输出
 #ifdef __cplusplus
 }
 #endif

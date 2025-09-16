@@ -296,6 +296,7 @@ def main():
         print(f"设备打开失败，错误代码: {handle}")
         return
 
+
     print(f"设备打开成功，句柄: {handle}")
     print("\n测试I2S音频传输功能...")
     try:
@@ -305,16 +306,17 @@ def main():
         i2s_config.Standard = I2S_STANDARD_PHILIPS   # 飞利浦标准
         i2s_config.DataFormat = I2S_DATAFORMAT_16B  # 16位数据格式
         i2s_config.MCLKOutput = I2S_MCLKOUTPUT_ENABLE  # 启用MCLK输出
-        i2s_config.AudioFreq = I2S_AUDIOFREQ_48K    # 16kHz采样率
-        
+        i2s_config.AudioFreq = I2S_AUDIOFREQ_16K    # 16kHz采样率
+        # i2s_config.AudioFreq = I2S_AUDIOFREQ_48K    # 48kHz采样率
+
         i2s_init_result = usb_application.I2S_Init(serial_param, I2S_INDEX_1, byref(i2s_config))
         time.sleep(0.5)
         if i2s_init_result != I2S_SUCCESS:
             print(f"I2S初始化失败，错误代码: {i2s_init_result}")
             return
 
-        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\16K_16BIT.wav"
-        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\48_xl.wav"
+        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\16k.wav"
+        # wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\48_xl.wav"
         print(f"使用固定WAV文件: {wav_file_path}")
         if not os.path.exists(wav_file_path):
             print(f"错误: WAV文件不存在: {wav_file_path}")
@@ -352,16 +354,12 @@ def main():
         write_buffer = (c_ubyte * write_buffer_size)()
         for i in range(write_buffer_size):
             write_buffer[i] = i
-
-        # ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, write_buffer, len(write_buffer))
-        # print(f'ret:{ret}')
-
         print("开始WAV音频传输...")
         # 先发送前8个音频块，让队列有数据持续播放
         initial_chunks = min(8, len(audio_chunks))
         print(f"预填充音频队列 (前{initial_chunks}个音频块)...")
         for i in range(initial_chunks):
-            ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]))
+            ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]) )
             if ret == 0:
                 print(f"成功发送第 {i+1} 个音频块")
             else:
@@ -382,7 +380,7 @@ def main():
                         print(f"队列状态查询失败: {queue_status}")
                         break
                 # 发送音频块
-                ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]))
+                ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]) )
                 if ret == 0:
                     if (i + 1) % 50 == 0 or i == len(audio_chunks) - 1:
                         print(f"成功发送第 {i+1} 个音频块")

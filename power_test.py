@@ -133,8 +133,6 @@ def main():
         # buffer_size = 102400
         # buffer = (c_ubyte * buffer_size)()
         # print("尝试读取数据...")
-
-        
         # ===================================================
         # 函数: USB_ReadData
         # 描述: 从USB设备读取数据

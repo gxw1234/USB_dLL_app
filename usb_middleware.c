@@ -91,6 +91,20 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_STATUS].cs);
             
             // debug_printf("分发状态数据: %d字节, cmd_id=%d, device_index=%d", status_data_len, header->cmd_id, header->device_index);
+        } else if (header->protocol_type == PROTOCOL_GET_FIRMWARE_INFO) {
+            // 处理固件信息响应数据
+            unsigned char* firmware_data = raw_data + pos;  // 包含完整的协议头和数据
+            int firmware_data_len = packet_size;
+            
+            debug_printf("收到固件信息响应: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
+                        header->protocol_type, header->cmd_id, header->device_index, firmware_data_len);
+            
+            // 将固件信息数据写入原始缓冲区，供应用层读取
+            EnterCriticalSection(&device->raw_buffer.cs);
+            write_to_ring_buffer(&device->raw_buffer, firmware_data, firmware_data_len);
+            LeaveCriticalSection(&device->raw_buffer.cs);
+            
+            debug_printf("分发固件信息数据: %d字节, cmd_id=%d, device_index=%d", firmware_data_len, header->cmd_id, header->device_index);
         } else {
             debug_printf("收到非SPI协议数据: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
         }

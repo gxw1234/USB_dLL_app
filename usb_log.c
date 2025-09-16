@@ -43,14 +43,11 @@ void debug_printf(const char* format, ...) {
     if (USB_DEBUG_ENABLE == 0 || g_log_enabled) {
         FILE* fp = fopen("usb_debug.log", "a");
         if (fp) {
-
             time_t now = time(NULL);
             struct tm* tm_info = localtime(&now);
             char time_str[26];
             strftime(time_str, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-
             fprintf(fp, "[%s] ", time_str);
-
             va_list args;
             va_start(args, format);
             vfprintf(fp, format, args);
