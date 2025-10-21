@@ -5,7 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include "platform_compat.h"
+#endif
 #include <time.h>
 #include "usb_log.h"
 

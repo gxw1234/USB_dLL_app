@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "usb_log.h"
-
 int I2S_Init(const char* target_serial, int I2SIndex, PI2S_CONFIG pConfig) {
     if (!target_serial || !pConfig) {
         debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);

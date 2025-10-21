@@ -1,6 +1,16 @@
 # Python示例
 import ctypes
-from ctypes import Structure, c_char, c_ushort, c_int
+import os
+import sys
+from ctypes import (
+    Structure,
+    c_char,
+    c_ushort,
+    c_int,
+    POINTER,
+    byref,
+    create_string_buffer,
+)
 
 # 定义设备信息结构体
 class DeviceInfo(Structure):
@@ -14,19 +24,42 @@ class DeviceInfo(Structure):
     ]
 
 # 扫描设备
-usb_dll = ctypes.CDLL(r"D:\STM32OBJ\usb_test_obj\test_1\USB_dLL_app\USB_G2X.dll")
+# 按平台选择库文件（Windows: USB_G2X.dll；Linux: USB_G2X.so）
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if sys.platform.startswith("win"):
+    lib_path = os.path.join(_script_dir, "USB_G2X.dll")
+else:
+    # 仅加载同目录 libusb，本地不存在则交由 C 层报错
+    libusb_candidates = [
+        os.path.join(_script_dir, "libusb-1.0.so.0"),
+        os.path.join(_script_dir, "libusb-1.0.so"),
+    ]
+    for p in libusb_candidates:
+        if os.path.exists(p):
+            try:
+                ctypes.CDLL(p)
+                break
+            except OSError:
+                pass
+    lib_path = os.path.join(_script_dir, "USB_G2X.so")
+
+
+
+
+usb_dll = ctypes.CDLL(lib_path)
+
 max_devices = 10
 devices = (DeviceInfo * max_devices)()
-result = usb_dll.USB_ScanDevices(ctypes.byref(devices), max_devices)
-
+# 指定函数签名，传入设备数组指针
+usb_dll.USB_ScanDevices.argtypes = [POINTER(DeviceInfo), c_int]
+usb_dll.USB_ScanDevices.restype = c_int
+result = usb_dll.USB_ScanDevices(devices, max_devices)
+print(result)
 if result >= 0:
     print(f"找到 {result} 个设备")
     for i in range(result):
         device = devices[i]
         print(f"设备{i}: {device.serial.decode('utf-8')}")
-else:
-    print(f"扫描失败，错误码: {result}")
-
 
 # 定义设备详细信息结构体
 class DeviceInfoDetail(Structure):
@@ -44,7 +77,6 @@ class DeviceInfoDetail(Structure):
         ("SerialNumber", c_int * 3),
         ("Functions", c_int)
     ]
-
 
 # 设置函数参数类型
 usb_dll.USB_GetDeviceInfo.argtypes = [ctypes.c_char_p, POINTER(DeviceInfoDetail), ctypes.c_char_p]

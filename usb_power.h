@@ -5,7 +5,11 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include "platform_compat.h"
+#endif
 #include <stdint.h>
 
 

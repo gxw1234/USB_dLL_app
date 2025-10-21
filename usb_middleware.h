@@ -12,7 +12,11 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include "platform_compat.h"
+#endif
 
 
 #define PROTOCOL_SPI        0x01    // SPI协议

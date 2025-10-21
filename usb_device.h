@@ -10,7 +10,13 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
 #include <windows.h>
+#else
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+#endif
 #include <stdint.h>
 #include "usb_log.h"
 

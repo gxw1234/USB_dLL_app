@@ -10,9 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <windows.h>
 #include <stdint.h>
-#include <process.h>  
+#ifdef _WIN32
+#include <windows.h>
+#include <process.h>
+#else
+#include "platform_compat.h"
+#endif
 
 
 extern void debug_printf(const char *format, ...);
@@ -289,6 +293,17 @@ WINAPI void USB_SetLogging(int enable) {
     USB_SetLog(enable);
 }
 
+#ifndef _WIN32
+__attribute__((constructor)) static void so_ctor(void) {
+    usb_middleware_init();
+}
+
+__attribute__((destructor)) static void so_dtor(void) {
+    usb_middleware_cleanup();
+}
+#endif
+
+#ifdef _WIN32
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:
@@ -302,3 +317,4 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     }
     return TRUE;
 }
+#endif

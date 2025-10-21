@@ -3,6 +3,7 @@
  * @brief USB设备底层操作实现
  */
 
+#define _GNU_SOURCE 1
 #include "usb_device.h"
 #include "usb_log.h"
 #include <stdio.h>
@@ -11,9 +12,16 @@
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
 
 
+#ifdef _WIN32
 static HMODULE hLibusbDll = NULL;
+#else
+static void* hLibusbDll = NULL;
+#endif
 void* g_libusb_context = NULL;
 int g_is_initialized = 0;
 
@@ -56,6 +64,7 @@ int usb_device_init(void) {
         return USB_SUCCESS;
     }
 
+#ifdef _WIN32
     char dll_path[MAX_PATH];
     char libusb_path[MAX_PATH];
     HMODULE hCurrentDll = GetModuleHandle("USB_G2X.dll");
@@ -79,8 +88,51 @@ int usb_device_init(void) {
         return USB_ERROR_OTHER;
     }
     debug_printf("成功加载libusb-1.0.dll");
+#else
+    // 仅允许使用本地 libusb（模块同目录或当前工作目录），不存在则报错，不使用系统库
+    {
+        Dl_info dli;
+        char dirbuf[1024];
+        dirbuf[0] = '\0';
+
+        // 先尝试从当前模块(USB_G2X.so)所在目录加载
+        if (dladdr((void*)&usb_device_init, &dli) && dli.dli_fname) {
+            const char* slash = strrchr(dli.dli_fname, '/');
+            if (slash) {
+                size_t dir_len = (size_t)(slash - dli.dli_fname);
+                if (dir_len < sizeof(dirbuf)) {
+                    memcpy(dirbuf, dli.dli_fname, dir_len);
+                    dirbuf[dir_len] = '\0';
+                    char candidate[1200];
+                    snprintf(candidate, sizeof(candidate), "%s/%s", dirbuf, "libusb-1.0.so.0");
+                    hLibusbDll = dlopen(candidate, RTLD_LAZY);
+                    if (!hLibusbDll) {
+                        snprintf(candidate, sizeof(candidate), "%s/%s", dirbuf, "libusb-1.0.so");
+                        hLibusbDll = dlopen(candidate, RTLD_LAZY);
+                    }
+                }
+            }
+        }
+
+        // 若同目录未找到，则尝试当前工作目录
+        if (!hLibusbDll) {
+            hLibusbDll = dlopen("./libusb-1.0.so.0", RTLD_LAZY);
+            if (!hLibusbDll) {
+                hLibusbDll = dlopen("./libusb-1.0.so", RTLD_LAZY);
+            }
+        }
+
+        if (!hLibusbDll) {
+            const char* err2 = dlerror();
+            debug_printf("未找到本地libusb-1.0.so(.0)，仅允许使用本地库: %s", err2 ? err2 : "未知错误");
+            return USB_ERROR_OTHER;
+        }
+        debug_printf("成功加载本地libusb-1.0");
+    }
+#endif
 
     // 获取函数指针
+    #ifdef _WIN32
     p_libusb_init = (libusb_init_t)GetProcAddress(hLibusbDll, "libusb_init");
     p_libusb_exit = (libusb_exit_t)GetProcAddress(hLibusbDll, "libusb_exit");
     p_libusb_open_device_with_vid_pid = (libusb_open_device_with_vid_pid_t)GetProcAddress(hLibusbDll, "libusb_open_device_with_vid_pid");
@@ -94,13 +146,32 @@ int usb_device_init(void) {
     p_libusb_get_string_descriptor_ascii = (libusb_get_string_descriptor_ascii_t)GetProcAddress(hLibusbDll, "libusb_get_string_descriptor_ascii");
     p_libusb_get_device = (libusb_get_device_t)GetProcAddress(hLibusbDll, "libusb_get_device");
     p_libusb_open = (libusb_open_t)GetProcAddress(hLibusbDll, "libusb_open");
+    #else
+    p_libusb_init = (libusb_init_t)dlsym(hLibusbDll, "libusb_init");
+    p_libusb_exit = (libusb_exit_t)dlsym(hLibusbDll, "libusb_exit");
+    p_libusb_open_device_with_vid_pid = (libusb_open_device_with_vid_pid_t)dlsym(hLibusbDll, "libusb_open_device_with_vid_pid");
+    p_libusb_close = (libusb_close_t)dlsym(hLibusbDll, "libusb_close");
+    p_libusb_claim_interface = (libusb_claim_interface_t)dlsym(hLibusbDll, "libusb_claim_interface");
+    p_libusb_release_interface = (libusb_release_interface_t)dlsym(hLibusbDll, "libusb_release_interface");
+    p_libusb_bulk_transfer = (libusb_bulk_transfer_t)dlsym(hLibusbDll, "libusb_bulk_transfer");
+    p_libusb_get_device_list = (libusb_get_device_list_t)dlsym(hLibusbDll, "libusb_get_device_list");
+    p_libusb_free_device_list = (libusb_free_device_list_t)dlsym(hLibusbDll, "libusb_free_device_list");
+    p_libusb_get_device_descriptor = (libusb_get_device_descriptor_t)dlsym(hLibusbDll, "libusb_get_device_descriptor");
+    p_libusb_get_string_descriptor_ascii = (libusb_get_string_descriptor_ascii_t)dlsym(hLibusbDll, "libusb_get_string_descriptor_ascii");
+    p_libusb_get_device = (libusb_get_device_t)dlsym(hLibusbDll, "libusb_get_device");
+    p_libusb_open = (libusb_open_t)dlsym(hLibusbDll, "libusb_open");
+    #endif
     
     if (!p_libusb_init || !p_libusb_exit || !p_libusb_open_device_with_vid_pid || !p_libusb_close ||
         !p_libusb_claim_interface || !p_libusb_bulk_transfer || !p_libusb_release_interface ||
         !p_libusb_get_device_list || !p_libusb_free_device_list || !p_libusb_get_device_descriptor ||
         !p_libusb_get_string_descriptor_ascii || !p_libusb_get_device || !p_libusb_open) {
         debug_printf("获取函数指针失败");
+        #ifdef _WIN32
         FreeLibrary(hLibusbDll);
+        #else
+        dlclose(hLibusbDll);
+        #endif
         hLibusbDll = NULL;
         return USB_ERROR_OTHER;
     }
@@ -111,7 +182,11 @@ int usb_device_init(void) {
     int ret = p_libusb_init(&g_libusb_context);
     if (ret != LIBUSB_SUCCESS) {
         debug_printf("初始化libusb失败, 错误码: %d", ret);
+        #ifdef _WIN32
         FreeLibrary(hLibusbDll);
+        #else
+        dlclose(hLibusbDll);
+        #endif
         hLibusbDll = NULL;
         return USB_ERROR_OTHER;
     }
@@ -131,7 +206,11 @@ void usb_device_cleanup(void) {
         g_libusb_context = NULL;
     }
     if (hLibusbDll) {
+        #ifdef _WIN32
         FreeLibrary(hLibusbDll);
+        #else
+        dlclose(hLibusbDll);
+        #endif
         hLibusbDll = NULL;
     }
 

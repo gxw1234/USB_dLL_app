@@ -10,7 +10,9 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 // 调试开关，0=开启日志，1=关闭日志
 #define USB_DEBUG_ENABLE 1
