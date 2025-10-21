@@ -8,15 +8,11 @@
 
 #include "usb_log.h"
 
-
-
-
 int SPI_Init(const char* target_serial, int SPIIndex, PSPI_CONFIG pConfig) {
     if (!target_serial || !pConfig) {
         debug_printf("参数无效: target_serial=%p, pConfig=%p", target_serial, pConfig);
         return SPI_ERROR_INVALID_PARAM;
     }
-
     int device_id = usb_middleware_find_device_by_serial(target_serial);
     if (device_id < 0) {
         debug_printf("设备未打开: %s", target_serial);

@@ -285,8 +285,6 @@ def main():
 
     # 打开第一个设备
     print(f"打开设备: {devices[0].serial.decode('utf-8', errors='ignore').strip('\x00')}")
-
-
     serial_param = devices[0].serial
 
     handle = usb_application.USB_OpenDevice(serial_param)

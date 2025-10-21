@@ -94,6 +94,9 @@ int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length)
 // 专用状态数据读取函数
 int usb_middleware_read_status_data(int device_id, unsigned char* data, int length);
 
+// 专用电源/电流数据读取函数
+int usb_middleware_read_power_data(int device_id, unsigned char* data, int length);
+
 int usb_middleware_write_data(int device_id, unsigned char* data, int length);
 
 // ==================== 内部工具函数 ====================

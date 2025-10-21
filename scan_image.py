@@ -241,7 +241,6 @@ def main():
                 sent_count = 0
                 max_send_count = 92
                 print(f"开始发送 {max_send_count} 张图像...")
-
                 for i in range(max_send_count):
                     max_retries = 3  #重试次数
                     retry_count = 0

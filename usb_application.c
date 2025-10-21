@@ -22,7 +22,7 @@ extern void debug_printf(const char *format, ...);
 
 // DLL版本号 在这里修改
 #define DLL_VERSION_MAJOR    1
-#define DLL_VERSION_MINOR    4
+#define DLL_VERSION_MINOR    5
 #define DLL_VERSION  ((DLL_VERSION_MAJOR << 8) | DLL_VERSION_MINOR)
 
 

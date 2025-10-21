@@ -15,6 +15,7 @@
 #define PROTOCOL_GET_FIRMWARE_INFO    0x08    
 #define PROTOCOL_STATUS    0x09    // 专用状态响应协议
 #define PROTOCOL_AUDIO      0x0A    // 音频协议
+#define PROTOCOL_CURRENT    0x0B    // 电流数据协议
 
 
 //------------cmd_id以下都是命令ID-------------------------
@@ -59,6 +60,8 @@
 #define POWER_CMD_START_READING 0x02  // 开始读取电流命令
 #define POWER_CMD_STOP_READING  0x03  // 停止读取电流命令
 #define POWER_CMD_READ_CURRENT_DATA     0x04  // 读取电流数据命令
+#define POWER_CMD_POWER_ON      0x04  // 电源上电命令
+#define POWER_CMD_POWER_OFF     0x05  // 电源断电命令
 
 //----Audio I2S------------
 #define AUDIO_CMD_INIT      0x01  // 初始化命令
@@ -68,6 +71,8 @@
 #define AUDIO_CMD_STATUS    0x05  // 状态查询命令
 #define AUDIO_CMD_VOLUME    0x06  // 音量控制命令
 
+//----Current Data------------
+#define CURRENT_CMD_DATA   0x01  // 电流数据命令
 
 //ST发送PC接收
 // 协议类型定义  protocol_type
