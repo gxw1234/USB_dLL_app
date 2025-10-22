@@ -94,6 +94,15 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_STATUS].cs);
             
             // debug_printf("分发状态数据: %d字节, cmd_id=%d, device_index=%d", status_data_len, header->cmd_id, header->device_index);
+        } else if (header->protocol_type == PROTOCOL_GPIO) {
+            if (header->cmd_id == GPIO_DIR_READ && header->data_len >= 1) {
+                unsigned char level = *(raw_data + pos + sizeof(GENERIC_CMD_HEADER));
+                unsigned int idx = header->device_index;
+                if (idx < 256) {
+                    device->gpio_level[idx] = level;
+                    device->gpio_level_valid[idx] = 1;
+                }
+            }
         } else if (header->protocol_type == PROTOCOL_GET_FIRMWARE_INFO) {
             // 处理固件信息响应数据
             unsigned char* firmware_data = raw_data + pos;  // 包含完整的协议头和数据
@@ -698,6 +707,34 @@ int usb_middleware_read_status_data(int device_id, unsigned char* data, int leng
     
     LeaveCriticalSection(&status_rb->cs);
     return to_read;
+}
+
+int usb_middleware_wait_gpio_level(int device_id, int gpio_index, unsigned char* level, int timeout_ms) {
+    if (!g_initialized || !level || gpio_index < 0 || gpio_index >= 256) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int slot = -1;
+    for (int i = 0; i < MAX_DEVICES; i++) {
+        if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == -1) {
+        debug_printf("设备未找到或未打开: %d", device_id);
+        return USB_ERROR_NOT_FOUND;
+    }
+    int waited = 0;
+    while (waited <= timeout_ms) {
+        if (g_devices[slot].gpio_level_valid[gpio_index]) {
+            *level = g_devices[slot].gpio_level[gpio_index];
+            g_devices[slot].gpio_level_valid[gpio_index] = 0;
+            return USB_SUCCESS;
+        }
+        Sleep(1);
+        waited += 1;
+    }
+    return USB_ERROR_TIMEOUT;
 }
 
 int usb_middleware_read_power_data(int device_id, unsigned char* data, int length) {

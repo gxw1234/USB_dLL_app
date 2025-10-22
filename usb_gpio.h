@@ -24,6 +24,9 @@ int GPIO_SetInput(const char* target_serial, int GPIOIndex, uint8_t pull_mode);
 //普通写入GPIO
 int GPIO_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue);
 
+//读取GPIO电平（0/1）
+int GPIO_Read(const char* target_serial, int GPIOIndex, uint8_t* level);
+
 //扫描写入GPIO，需要等待IIC响应，才返回
 int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t WriteValue);
 

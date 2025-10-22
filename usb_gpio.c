@@ -176,6 +176,40 @@ WINAPI int GPIO_scan_Write(const char* target_serial, int GPIOIndex, uint8_t Wri
     return USB_ERROR_OTHER;
 }
 
+WINAPI int GPIO_Read(const char* target_serial, int GPIOIndex, uint8_t* level) {
+    if (!target_serial || !level) {
+        debug_printf("参数无效: target_serial=%p, level=%p", target_serial, level);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
+    }
+
+    // 发送读取命令
+    GENERIC_CMD_HEADER cmd_header;
+    cmd_header.protocol_type = PROTOCOL_GPIO;
+    cmd_header.cmd_id = GPIO_DIR_READ;
+    cmd_header.device_index = (uint8_t)GPIOIndex;
+    cmd_header.param_count = 0;
+    cmd_header.data_len = 0;
+    unsigned char* send_buffer;
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, NULL, 0);
+    if (total_len < 0) {
+        return USB_ERROR_OTHER;
+    }
+    int ret = usb_middleware_write_data(device_id, send_buffer, total_len);
+    free(send_buffer);
+    if (ret < 0) {
+        return USB_ERROR_OTHER;
+    }
+
+    // 从数组等待电平值（中间层在解析线程写入）
+    int wait_ret = usb_middleware_wait_gpio_level(device_id, GPIOIndex, level, 2000);
+    return wait_ret;
+}
+
 WINAPI int USB_device_reset(const char* target_serial) {
     if (!target_serial) {
         debug_printf("参数无效: target_serial=%p", target_serial);

@@ -246,6 +246,25 @@ def main():
             print(f"成功发送设置电压命令，")
         else:
             print(f"设置电压失败，错误代码: {power_result}")
+    if 1:
+
+        print("开始")
+        gpio_index = 1
+        # 设置为输入，上拉(1)
+        set_input_ret = usb_application.GPIO_SetInput(serial_param, gpio_index, 1)
+        if set_input_ret != GPIO_SUCCESS:
+            print(f"设置GPIO为输入失败，错误代码: {set_input_ret}")
+        else:
+            print("11111111")
+            level = c_ubyte()
+            read_ret = usb_application.GPIO_Read(serial_param, gpio_index, byref(level))
+            if read_ret == GPIO_SUCCESS:
+                print(f"GPIO{gpio_index} 的电平为: {level.value}")
+            else:
+                print(f"读取GPIO电平失败，错误代码: {read_ret}")
+
+
+  
 
 
 

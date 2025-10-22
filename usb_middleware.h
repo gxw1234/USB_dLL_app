@@ -20,10 +20,10 @@ extern "C" {
 
 
 #define PROTOCOL_SPI        0x01    // SPI协议
+#define PROTOCOL_GPIO       0x04    // GPIO协议
 #define PROTOCOL_POWER      0x05    // 电源协议
 #define PROTOCOL_STATUS     0x09    // 状态响应协议
-#define MAX_PROTOCOL_TYPES  10      // 最大协议类型数量(0=未使用, 1=SPI, 5=POWER, 9=STATUS)
-
+#define MAX_PROTOCOL_TYPES  10      // 最大协议类型数量(0=未使用, 1=SPI, 4=GPIO, 5=POWER, 9=STATUS)
 typedef struct {
     unsigned char* buffer;     // 缓冲区指针
     unsigned int size;         // 缓冲区大小
@@ -64,6 +64,9 @@ typedef struct {
     int stop_thread;           
     ring_buffer_t protocol_buffers[MAX_PROTOCOL_TYPES]; 
     ring_buffer_t raw_buffer;  
+    // GPIO电平缓存：按device_index存储最近一次读取的电平
+    unsigned char gpio_level[256];
+    unsigned char gpio_level_valid[256];
 } device_handle_t;
 
 // 错误代码定义
@@ -94,6 +97,9 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length);
 
 
 int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length);
+
+// GPIO电平等待获取（从数组中取），timeout_ms毫秒
+int usb_middleware_wait_gpio_level(int device_id, int gpio_index, unsigned char* level, int timeout_ms);
 
 // 专用状态数据读取函数
 int usb_middleware_read_status_data(int device_id, unsigned char* data, int length);

@@ -44,6 +44,7 @@
 #define GPIO_DIR_INPUT   0x00    // 输入模式
 #define GPIO_DIR_WRITE   0x03    // 写入
 #define GPIO_SCAN_DIR_WRITE   0x04    // 扫描写入
+#define GPIO_DIR_READ   0x06    // 读取
 
 //----Bootloader------------
 #define BOOTLOADER_START_WRITE    0x04    // 开始写数据命令
