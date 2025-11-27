@@ -132,6 +132,7 @@ def main():
                 print("请输入有效的数字")
 
     serial_param = devices[selected_device].serial
+    # serial_param ="357C39673033".encode()
     print(f"已选择设备: {serial_param.decode('utf-8')}")
 
     # ===================================================
@@ -182,6 +183,16 @@ def main():
         print(f"设备打开失败，错误代码: {open_result}")
         return
 
+
+
+
+
+
+
+
+
+
+
     # ===================================================
     # 函数: USB_GetDeviceInfo
     # 描述: 获取设备详细信息
@@ -224,6 +235,17 @@ def main():
         print(f"  支持功能: {func_str.value.decode('utf-8')}")
     else:
         print(f"获取设备详细信息失败，错误代码: {info_result}")
+
+
+
+
+
+
+
+
+
+
+
 
 
     # print("\n关闭设备...")

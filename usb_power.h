@@ -35,7 +35,6 @@ WINAPI int POWER_StartCurrentReading(const char* target_serial, uint8_t channel)
 
 WINAPI int POWER_StopCurrentReading(const char* target_serial, uint8_t channel);
 
-
 WINAPI int POWER_ReadCurrentData(const char* target_serial, uint8_t channel, unsigned char* buffer, int buffer_size);
 
 
@@ -44,6 +43,12 @@ WINAPI int POWER_PowerOn(const char* target_serial, uint8_t channel);
 
 //电源控制 关
 WINAPI int POWER_PowerOff(const char* target_serial, uint8_t channel);
+
+//启动电源测试模式
+WINAPI int POWER_StartTestMode(const char* target_serial, uint8_t channel);
+
+//停止电源测试模式
+WINAPI int POWER_StopTestMode(const char* target_serial, uint8_t channel);
 
 #ifdef __cplusplus
 }

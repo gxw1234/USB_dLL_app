@@ -11,6 +11,7 @@ import time
 from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, Structure, POINTER, create_string_buffer
 from ctypes import *
 
+
 # 定义设备信息结构体
 class DeviceInfo(Structure):
     _fields_ = [
@@ -22,6 +23,7 @@ class DeviceInfo(Structure):
         ("device_id", c_int)
     ]
 
+
 def parse_bin_file(bin_file_path):
     """
     直接读取BIN文件，返回二进制数据
@@ -29,17 +31,17 @@ def parse_bin_file(bin_file_path):
     if not os.path.exists(bin_file_path):
         print(f"错误: BIN文件不存在: {bin_file_path}")
         return None
-    
+
     try:
         with open(bin_file_path, 'rb') as f:
             binary_data = f.read()
-        
         print(f"成功读取BIN文件，总大小: {len(binary_data)} 字节")
         return binary_data
-        
+
     except Exception as e:
         print(f"读取BIN文件出错: {e}")
         return None
+
 
 def split_data_to_packets(data, packet_size=450):
     """
@@ -47,9 +49,9 @@ def split_data_to_packets(data, packet_size=450):
     """
     packets = []
     for i in range(0, len(data), packet_size):
-        packet = data[i:i+packet_size]
+        packet = data[i:i + packet_size]
         packets.append(packet)
-    
+
     print(f"数据分割完成，总包数: {len(packets)}，每包大小: {packet_size} 字节")
     return packets
 
@@ -58,10 +60,12 @@ def main():
     # 当前目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
     dll_path = os.path.join(current_dir, "USB_G2X.dll")
-    
+
     # 指定要烧录的BIN文件路径
+    bin_file_path = r'D:\STM32OBJ\usb_test_obj\boot\fw\build\fw.bin'
+    bin_file_path = r'D:\STM32OBJ\usb_test_obj\boot\boot_test\build\usb_app.bin'
     bin_file_path = r'D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\build\usb_app.bin'
-    
+    # bin_file_path = r'D:\STM32OBJ\usb_test_obj\test_1\master\stm32h750ibt6\build\usb_app.bin'
     print(f"正在加载DLL: {dll_path}")
     print(f"准备烧录BIN文件: {bin_file_path}")
 
@@ -74,14 +78,13 @@ def main():
     firmware_data = parse_bin_file(bin_file_path)
     if firmware_data is None:
         return
-    
     # 分割数据为450字节的包
     data_packets = split_data_to_packets(firmware_data, 450)
 
     # 加载DLL
     usb_application = ctypes.CDLL(dll_path)
     print("成功加载DLL")
-    
+
     # 扫描设备
     max_devices = 10
     devices = (DeviceInfo * max_devices)()
@@ -111,14 +114,39 @@ def main():
     time.sleep(1)
     if handle >= 0:
         print(f"设备打开成功，句柄: {handle}")
-
-
         if 1:
             try:
-                # 发送开始写入命令
-                print("发送开始写入命令...")
                 dummy_data = (c_ubyte * 1)(0)  # 开始写入命令只需要一个字节的数据
-                start_ret = usb_application.Bootloader_StartWrite(serial_param, 1, dummy_data, 1)
+                # 切换到Bootloader并复位（设备将重新枚举）
+                usb_application.Bootloader_SwitchBoot(serial_param, 1, dummy_data, 1)
+                usb_application.Bootloader_Reset(serial_param, 1, dummy_data, 1)
+                # 关闭旧设备句柄，等待重新枚举  这里复位了，
+                usb_application.USB_CloseDevice(serial_param)
+                time.sleep(2.0)
+                # 轮询扫描直到设备重新出现并打开
+                reopened = False
+                for _ in range(50):  # 最多 ~5s
+                    devices = (DeviceInfo * max_devices)()
+                    cnt = usb_application.USB_ScanDevices(ctypes.byref(devices), max_devices)
+                    if cnt > 0:
+                        serial_param = devices[0].serial
+                        handle = usb_application.USB_OpenDevice(serial_param)
+                        if handle >= 0:
+                            reopened = True
+                            print(f"设备重新连接成功，句柄: {handle}")
+                            break
+                    time.sleep(0.1)
+                if not reopened:
+                    print("错误: 复位后未能重新连接到设备")
+                    return
+
+                # 发送开始写入命令（附带固件总长度，4字节小端）
+                print("发送开始写入命令...")
+                fw_len = len(firmware_data)
+                print(f"固件总大小: {fw_len} 字节")
+                fw_len_bytes = fw_len.to_bytes(4, byteorder='little', signed=False)
+                start_payload = (c_ubyte * 4)(*fw_len_bytes)
+                start_ret = usb_application.Bootloader_StartWrite(serial_param, 1, start_payload, 4)
                 print(f"开始写入命令返回: {start_ret}")
                 if start_ret != 0:
                     print(f"开始写入命令失败，返回码: {start_ret}")
@@ -130,18 +158,17 @@ def main():
                     packet_buffer = (c_ubyte * len(packet))(*packet)
                     ret = usb_application.Bootloader_WriteBytes(serial_param, 1, packet_buffer, len(packet))
                     if ret != 0:
-                        print(f"第 {i+1} 包发送失败，返回码: {ret}")
+                        print(f"第 {i + 1} 包发送失败，返回码: {ret}")
                         break
                     else:
                         # 显示进度
                         progress = (i + 1) / len(data_packets) * 100
-                        print(f"进度: {i+1}/{len(data_packets)} ({progress:.1f}%) - 包大小: {len(packet)} 字节")
+                        print(f"进度: {i + 1}/{len(data_packets)} ({progress:.1f}%) - 包大小: {len(packet)} 字节")
 
                 end_time = time.time()
                 total_time = end_time - start_time
                 total_bytes = len(firmware_data)
                 speed = total_bytes / total_time / 1024  # KB/s
-
                 print(f"\n烧录完成!")
                 print(f"总时间: {total_time:.2f} 秒")
                 print(f"总大小: {total_bytes} 字节")
@@ -151,28 +178,15 @@ def main():
                 print("发送切换到应用程序模式命令...")
                 dummy_data = (c_ubyte * 1)(0)
                 usb_application.Bootloader_SwitchRun(serial_param, 1, dummy_data, 1)
-                
                 # 发送复位命令
+                time.sleep(1)
                 print("发送复位命令...")
                 usb_application.Bootloader_Reset(serial_param, 1, dummy_data, 1)
                 print("设备将重启并进入应用程序")
-
             except Exception as e:
                 print(f"烧录过程中出错: {e}")
 
 
-        if 1:  # 禁用原来的代码
-            dummy_data = (c_ubyte * 1)(0)  # 开始写入命令只需要一个字节的数据
-
-            start_ret = usb_application.Bootloader_SwitchRun(serial_param, 1, dummy_data, 1)
-            # start_ret = usb_application.Bootloader_SwitchBoot(serial_param, 1, dummy_data, 1)
-
-
-
-            start_ret = usb_application.Bootloader_Reset(serial_param, 1, dummy_data, 1)
-
-
-            print("11")
         # 关闭设备
         close_result = usb_application.USB_CloseDevice(serial_param)
         if close_result == 0:

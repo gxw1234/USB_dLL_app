@@ -124,32 +124,17 @@ def main():
     print(f"已选择设备: {serial_param.decode('utf-8')}")
     
     # ===================================================
-    # 函数: GPIO_SetOutput
-    # 描述: 设置GPIO为输出模式
+    # 函数: POWER_StartTestMode
+    # 描述: 启动电源测试模式
     # 参数:
     #   serial_param: 设备序列号
-    #   GPIOIndex: GPIO索引
-    #   OutputMask: 输出引脚掩码，每个位对应一个引脚，1表示设置为输出
+    #   channel: 电源通道
     # 返回值:
-    #   =0: 成功设置GPIO
-    #   <0: 设置失败，返回错误代码
+    #   =0: 成功启动测试模式
+    #   <0: 启动失败，返回错误代码
     # ===================================================
-    usb_application.GPIO_SetOutput.argtypes = [c_char_p, c_int, c_ubyte]
-    usb_application.GPIO_SetOutput.restype = c_int
-    
-    # ===================================================
-    # 函数: GPIO_Write
-    # 描述: 写入GPIO输出值
-    # 参数:
-    #   serial_param: 设备序列号
-    #   GPIOIndex: GPIO索引
-    #   WriteValue: 写入的值，每个位对应一个引脚
-    # 返回值:
-    #   =0: 成功写入GPIO
-    #   <0: 写入失败，返回错误代码
-    # ===================================================
-    usb_application.GPIO_Write.argtypes = [c_char_p, c_int, c_ubyte]
-    usb_application.GPIO_Write.restype = c_int
+    usb_application.POWER_StartTestMode.argtypes = [c_char_p, c_ubyte]
+    usb_application.POWER_StartTestMode.restype = c_int
     
 
     
@@ -209,7 +194,7 @@ def main():
 
     if 0:
         # 选择GPIO端口
-        gpio_index = 7
+        gpio_index = 1
         set_output_result = usb_application.GPIO_SetOutput(serial_param, gpio_index, 1)
         usb_application.GPIO_Write(serial_param, gpio_index, 1)  #默认状态
         time.sleep(1)
@@ -246,7 +231,7 @@ def main():
             print(f"成功发送设置电压命令，")
         else:
             print(f"设置电压失败，错误代码: {power_result}")
-    if 1:
+    if 0:
 
         print("开始")
         gpio_index = 1
@@ -262,9 +247,28 @@ def main():
                 print(f"GPIO{gpio_index} 的电平为: {level.value}")
             else:
                 print(f"读取GPIO电平失败，错误代码: {read_ret}")
+    if 0:
+        POWER_CHANNEL_1 = 0x01
+        print("调用 POWER_StartTestMode...")
+        result = usb_application.POWER_StartTestMode(serial_param, POWER_CHANNEL_1)
+        if result == 0:
+            print("电源测试模式启动成功!")
+        else:
+            print(f"电源测试模式启动失败，错误代码: {result}")
+    if 1:
 
 
-  
+  # 开始写入命令只需要一个字节的数据
+        # # 切换到Bootloader并复位（设备将重新枚举）
+        # usb_application.Bootloader_SwitchBoot(serial_param, 1, dummy_data, 1)
+        for i in range(3):
+            print("1")
+            dummy_data = (c_ubyte * 1)(0)
+            usb_application.Bootloader_Reset(serial_param, 1, dummy_data, 1)
+            print("2")
+            time.sleep(10)
+
+
 
 
 

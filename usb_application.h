@@ -19,13 +19,17 @@ extern "C" {
 #define USB_ERROR_OTHER        -99   // 其他错误
 
 #ifdef _WIN32
-    #ifdef BUILDING_DLL
-        #define WINAPI __declspec(dllexport)
-    #else
-        #define WINAPI __declspec(dllimport)
+    #ifndef WINAPI
+        #ifdef BUILDING_DLL
+            #define WINAPI __declspec(dllexport)
+        #else
+            #define WINAPI __declspec(dllimport)
+        #endif
     #endif
 #else
-    #define WINAPI
+    #ifndef WINAPI
+        #define WINAPI
+    #endif
 #endif
 
 // ==================== 设备信息结构体 ====================

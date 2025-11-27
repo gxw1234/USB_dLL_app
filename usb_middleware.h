@@ -78,6 +78,7 @@ typedef struct {
 #define USB_ERROR_ALREADY_OPEN -5    // 设备已打开
 #define USB_ERROR_NOT_OPEN     -6    // 设备未打开
 #define USB_ERROR_TIMEOUT      -7    // 超时错误
+#define USB_ERROR_BUSY         -8    // 设备忙碌
 #define USB_ERROR_OTHER        -99   // 其他错误
 
 // ==================== 设备管理接口 ====================
@@ -106,6 +107,9 @@ int usb_middleware_read_status_data(int device_id, unsigned char* data, int leng
 
 // 专用电源/电流数据读取函数
 int usb_middleware_read_power_data(int device_id, unsigned char* data, int length);
+
+// 专用PWM数据读取函数
+int usb_middleware_read_pwm_data(int device_id, unsigned char* data, int length);
 
 int usb_middleware_write_data(int device_id, unsigned char* data, int length);
 

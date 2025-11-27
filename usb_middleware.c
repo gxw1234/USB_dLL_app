@@ -16,6 +16,7 @@
 #define MAX_DEVICES 10
 #define SPI_BUFFER_SIZE (10 * 1024 * 1024)    // SPI专用缓冲区
 #define POWER_BUFFER_SIZE (512 * 1024)       // 电源数据缓冲区 (增大以适应电流数据)
+#define PWM_BUFFER_SIZE (4 * 1024)           // PWM专用缓冲区
 #define RAW_BUFFER_SIZE (512 * 1024)         //  原始数据临时缓冲区
 #define STATUS_BUFFER_SIZE (16 * 1024)       // 状态响应缓冲区
 
@@ -94,6 +95,19 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_STATUS].cs);
             
             // debug_printf("分发状态数据: %d字节, cmd_id=%d, device_index=%d", status_data_len, header->cmd_id, header->device_index);
+        } else if (header->protocol_type == PROTOCOL_PWM) {
+            // 处理PWM响应数据
+            unsigned char* pwm_data = raw_data + pos;  // 包含完整的协议头
+            int pwm_data_len = packet_size;
+            
+            debug_printf("收到PWM响应: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
+                        header->protocol_type, header->cmd_id, header->device_index, pwm_data_len);
+            
+            EnterCriticalSection(&device->protocol_buffers[PROTOCOL_PWM].cs);
+            write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_PWM], pwm_data, pwm_data_len);
+            LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_PWM].cs);
+            
+            // debug_printf("分发PWM数据: %d字节, cmd_id=%d, device_index=%d", pwm_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_GPIO) {
             if (header->cmd_id == GPIO_DIR_READ && header->data_len >= 1) {
                 unsigned char level = *(raw_data + pos + sizeof(GENERIC_CMD_HEADER));
@@ -384,6 +398,14 @@ int usb_middleware_open_device(const char* serial) {
     power_rb->data_size = 0;
     InitializeCriticalSection(&power_rb->cs);
     
+    ring_buffer_t* pwm_rb = &g_devices[slot].protocol_buffers[PROTOCOL_PWM];
+    pwm_rb->size = PWM_BUFFER_SIZE;
+    pwm_rb->buffer = (unsigned char*)malloc(PWM_BUFFER_SIZE);
+    pwm_rb->write_pos = 0;
+    pwm_rb->read_pos = 0;
+    pwm_rb->data_size = 0;
+    InitializeCriticalSection(&pwm_rb->cs);
+    
     ring_buffer_t* status_rb = &g_devices[slot].protocol_buffers[PROTOCOL_STATUS];
     status_rb->size = STATUS_BUFFER_SIZE;
     status_rb->buffer = (unsigned char*)malloc(STATUS_BUFFER_SIZE);
@@ -480,6 +502,15 @@ int usb_middleware_close_device(int device_id) {
     }
     LeaveCriticalSection(&power_rb->cs);
     DeleteCriticalSection(&power_rb->cs);
+    
+    ring_buffer_t* pwm_rb = &g_devices[slot].protocol_buffers[PROTOCOL_PWM];
+    EnterCriticalSection(&pwm_rb->cs);
+    if (pwm_rb->buffer) {
+        free(pwm_rb->buffer);
+        pwm_rb->buffer = NULL;
+    }
+    LeaveCriticalSection(&pwm_rb->cs);
+    DeleteCriticalSection(&pwm_rb->cs);
     
     ring_buffer_t* status_rb = &g_devices[slot].protocol_buffers[PROTOCOL_STATUS];
     EnterCriticalSection(&status_rb->cs);
@@ -777,5 +808,46 @@ int usb_middleware_read_power_data(int device_id, unsigned char* data, int lengt
     }
     
     LeaveCriticalSection(&power_rb->cs);
+    return to_read;
+}
+
+int usb_middleware_read_pwm_data(int device_id, unsigned char* data, int length) {
+    if (!g_initialized || !data || length <= 0) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    int slot = -1;
+    for (int i = 0; i < MAX_DEVICES; i++) {
+        if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        debug_printf("设备未找到或未打开: %d", device_id);
+        return USB_ERROR_NOT_FOUND;
+    }
+    
+    usb_middleware_update_device_access(device_id);
+    ring_buffer_t* pwm_rb = &g_devices[slot].protocol_buffers[PROTOCOL_PWM];
+    
+    EnterCriticalSection(&pwm_rb->cs);
+    int available = pwm_rb->data_size;
+    int to_read = (available < length) ? available : length;
+    
+    if (to_read > 0) {
+        if (pwm_rb->read_pos + to_read <= pwm_rb->size) {
+            memcpy(data, pwm_rb->buffer + pwm_rb->read_pos, to_read);
+        } else {
+            int first_part = pwm_rb->size - pwm_rb->read_pos;
+            memcpy(data, pwm_rb->buffer + pwm_rb->read_pos, first_part);
+            memcpy(data + first_part, pwm_rb->buffer, to_read - first_part);
+        }
+        pwm_rb->read_pos = (pwm_rb->read_pos + to_read) % pwm_rb->size;
+        pwm_rb->data_size -= to_read;
+    }
+    
+    LeaveCriticalSection(&pwm_rb->cs);
     return to_read;
 }

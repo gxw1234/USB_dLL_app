@@ -15,10 +15,8 @@ from ctypes import c_int, c_char, c_char_p, c_ubyte, c_ushort, c_uint, byref, St
 # =============================================================================
 # I2S 配置宏定义 (对应C语言中的宏定义)
 # =============================================================================
-
 # I2S 接口索引
 I2S_INDEX_1 = 1    # I2S2 (与C语言中的I2S_INDEX_1保持一致)
-
 # I2S 模式定义
 I2S_MODE_MASTER_TX = 0    # 主机发送模式
 I2S_MODE_MASTER_RX = 1    # 主机接收模式
@@ -312,9 +310,8 @@ def main():
         if i2s_init_result != I2S_SUCCESS:
             print(f"I2S初始化失败，错误代码: {i2s_init_result}")
             return
-
-        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\R.wav"
-        # wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\48_xl.wav"
+        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\combined_stereo.wav"
+        # wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\L.wav"
         print(f"使用固定WAV文件: {wav_file_path}")
         if not os.path.exists(wav_file_path):
             print(f"错误: WAV文件不存在: {wav_file_path}")
@@ -338,11 +335,13 @@ def main():
         if not audio_chunks:
             print("读取WAV文件失败")
             return
-
         print(f"成功读取 {len(audio_chunks)} 个音频块")
-
         print("启动I2S音频队列...")
-        usb_application.I2S_SetVolume(serial_param, I2S_INDEX_1, 10)
+        usb_application.I2S_SetVolume(serial_param, I2S_INDEX_1, 40)
+
+
+
+        
         queue_start_result = usb_application.I2S_StartQueue(serial_param, I2S_INDEX_1)
         if queue_start_result != I2S_SUCCESS:
             print(f"启动I2S队列失败，错误代码: {queue_start_result}")

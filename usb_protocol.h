@@ -16,6 +16,7 @@
 #define PROTOCOL_STATUS    0x09    // 专用状态响应协议
 #define PROTOCOL_AUDIO      0x0A    // 音频协议
 #define PROTOCOL_CURRENT    0x0B    // 电流数据协议
+#define PROTOCOL_PWM        0x0C    // PWM协议
 
 
 //------------cmd_id以下都是命令ID-------------------------
@@ -53,6 +54,8 @@
 #define BOOTLOADER_SWITCH_BOOT   0x07    // 切换到BOOT模式
 #define BOOTLOADER_RESET   0x08    // 复位
 
+
+//----IIC------------
 #define GPIO_SCAN_MODE_WRITE   0x04    // IIC
 
 
@@ -63,6 +66,9 @@
 #define POWER_CMD_READ_CURRENT_DATA     0x04  // 读取电流数据命令
 #define POWER_CMD_POWER_ON      0x04  // 电源上电命令
 #define POWER_CMD_POWER_OFF     0x05  // 电源断电命令
+#define POWER_CMD_START_TEST_MODE     0x06  // 电源状态命令
+#define POWER_CMD_STOP_TEST_MODE     0x07  // 电源状态命令
+
 
 //----Audio I2S------------
 #define AUDIO_CMD_INIT      0x01  // 初始化命令
@@ -74,6 +80,12 @@
 
 //----Current Data------------
 #define CURRENT_CMD_DATA   0x01  // 电流数据命令
+
+//----PWM------------
+#define PWM_CMD_INIT            0x01  // PWM输入捕获初始化命令
+#define PWM_CMD_START_MEASURE   0x02  // 开始PWM测量命令
+#define PWM_CMD_STOP_MEASURE    0x03  // 停止PWM测量命令
+#define PWM_CMD_GET_RESULT      0x04  // 获取PWM测量结果命令
 
 //ST发送PC接收
 // 协议类型定义  protocol_type
