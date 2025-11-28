@@ -12,10 +12,12 @@
 #include "platform_compat.h"
 #endif
 
-WINAPI int PWM_Init(const char* target_serial, int pwm_index) {
+
+
+WINAPI int PWM_Init(const char* target_serial, int pwm_index, PWM_TimerConfig_t* config) {
     debug_printf("PWM_Init开始执行");
-    if (!target_serial) {
-        debug_printf("参数无效: target_serial=%p", target_serial);
+    if (!target_serial || !config) {
+        debug_printf("参数无效: target_serial=%p, config=%p", target_serial, config);
         return USB_ERROR_INVALID_PARAM;
     }
     
@@ -30,15 +32,19 @@ WINAPI int PWM_Init(const char* target_serial, int pwm_index) {
         return USB_ERROR_OTHER;
     }
     
+    debug_printf("PWM定时器配置: prescaler=%lu, period=%lu, mode=%lu, div=%lu, preload=%lu", 
+                config->prescaler, config->period, config->counter_mode, 
+                config->clock_division, config->auto_reload_preload);
+    
     GENERIC_CMD_HEADER cmd_header;
     cmd_header.protocol_type = PROTOCOL_PWM;
     cmd_header.cmd_id = PWM_CMD_INIT;
     cmd_header.device_index = (uint8_t)pwm_index;
     cmd_header.param_count = 0;
-    cmd_header.data_len = 0;
+    cmd_header.data_len = sizeof(PWM_TimerConfig_t);
     
     unsigned char* send_buffer;
-    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, NULL, 0);
+    int total_len = build_protocol_frame(&send_buffer, &cmd_header, NULL, 0, (unsigned char*)config, sizeof(PWM_TimerConfig_t));
     if (total_len < 0) {
         return USB_ERROR_OTHER;
     }

@@ -16,6 +16,15 @@ extern "C" {
 #endif
 #endif
 
+// PWM定时器配置结构体
+typedef struct {
+    uint32_t prescaler;           // 预分频器 (0-65535)
+    uint32_t period;              // 计数周期 (0-65535 for 16-bit timer)
+    uint32_t counter_mode;        // 计数模式 (0=UP, 1=DOWN, 2=CENTER_ALIGNED1, etc.)
+    uint32_t clock_division;      // 时钟分频 (0=DIV1, 1=DIV2, 2=DIV4)
+    uint32_t auto_reload_preload; // 自动重载预装载 (0=DISABLE, 1=ENABLE)
+} PWM_TimerConfig_t;
+
 // PWM测量结果结构体
 typedef struct {
     uint32_t frequency;     // 频率 (Hz)
@@ -26,9 +35,10 @@ typedef struct {
 
 // PWM输入捕获初始化
 // @param target_serial 设备序列号
-// @param pwm_index PWM通道索引 (1-4对应TIM2的CH1-CH4)
+// @param pwm_index PWM通道索引 (1对应PC7/TIM8_CH2)
+// @param config PWM定时器配置参数
 // @return 成功返回USB_SUCCESS，失败返回错误码
-WINAPI int PWM_Init(const char* target_serial, int pwm_index);
+WINAPI int PWM_Init(const char* target_serial, int pwm_index, PWM_TimerConfig_t* config);
 
 // 开始PWM测量
 // @param target_serial 设备序列号

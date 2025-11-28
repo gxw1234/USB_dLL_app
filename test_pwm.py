@@ -47,6 +47,16 @@ class DeviceInfo(ctypes.Structure):
         ("device_id", ctypes.c_int)
     ]
 
+# 定义PWM定时器配置结构体
+class PWMTimerConfig(ctypes.Structure):
+    _fields_ = [
+        ("prescaler", ctypes.c_uint32),           # 预分频器 (0-65535)
+        ("period", ctypes.c_uint32),              # 计数周期 (0-65535 for 16-bit timer)
+        ("counter_mode", ctypes.c_uint32),        # 计数模式 (0=UP, 1=DOWN, 2=CENTER_ALIGNED1, etc.)
+        ("clock_division", ctypes.c_uint32),      # 时钟分频 (0=DIV1, 1=DIV2, 2=DIV4)
+        ("auto_reload_preload", ctypes.c_uint32)  # 自动重载预装载 (0=DISABLE, 1=ENABLE)
+    ]
+
 # 定义PWM测量结果结构体
 class PWMMeasureResult(ctypes.Structure):
     _fields_ = [
@@ -80,8 +90,21 @@ def test_pwm_simple(serial):
     """简单PWM测试 - 只测试通道1"""
     print("\n🔧 PWM通道1测试...")
     
-    # 1. 初始化PWM通道1
-    ret = usb_dll.PWM_Init(serial.encode('utf-8'), 1)
+    # 创建PWM定时器配置结构体
+    pwm_config = PWMTimerConfig()
+    pwm_config.prescaler = 240 - 1      # 240MHz / 240 = 1MHz (1us分辨率)
+    pwm_config.period = 0xFFFF          # 16位计数器
+    pwm_config.counter_mode = 0         # TIM_COUNTERMODE_UP
+    pwm_config.clock_division = 0       # TIM_CLOCKDIVISION_DIV1
+    pwm_config.auto_reload_preload = 0  # TIM_AUTORELOAD_PRELOAD_DISABLE
+    
+    print(f"📋 定时器配置:")
+    print(f"   预分频器: {pwm_config.prescaler + 1} (时钟: {240000000 // (pwm_config.prescaler + 1) / 1000000:.1f}MHz)")
+    print(f"   计数周期: {pwm_config.period}")
+    print(f"   分辨率: {1000000 / (240000000 // (pwm_config.prescaler + 1)):.3f}us")
+    
+    # 1. 初始化PWM通道1 (带配置参数)
+    ret = usb_dll.PWM_Init(serial.encode('utf-8'), 1, ctypes.byref(pwm_config))
     if ret != 0:
         print(f"❌ PWM初始化失败: {ret}")
         return
