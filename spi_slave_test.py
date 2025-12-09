@@ -124,7 +124,7 @@ def main():
         spi_config.CPHA = 0
         spi_config.LSBFirst = 0  # MSB在前
         spi_config.SelPolarity = 0
-        spi_config.ClockSpeedHz = 10000000  # 25MHz
+        spi_config.ClockSpeedHz = 30000000  # 25MHz
         # ===================================================
         # 函数: SPI_Init
         # 描述: 初始化SPI设备
@@ -164,7 +164,7 @@ def main():
             print("\n开始读取SPI数据...")
             read_buffer_size = 20  # 读取缓冲区大小
             read_buffer = (c_ubyte * read_buffer_size)()
-            for i in range(5):
+            for i in range(1):
                 read_result = usb_application.SPI_SlaveReadBytes(serial_param, SPI1_CS0, read_buffer, read_buffer_size)
                 if read_result > 0:
                     print(f"第{i + 1}次读取成功，读取了{read_result}字节数据:")

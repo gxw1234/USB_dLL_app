@@ -17,6 +17,7 @@
 #define SPI_BUFFER_SIZE (10 * 1024 * 1024)    // SPI专用缓冲区
 #define POWER_BUFFER_SIZE (512 * 1024)       // 电源数据缓冲区 (增大以适应电流数据)
 #define PWM_BUFFER_SIZE (4 * 1024)           // PWM专用缓冲区
+#define UART_BUFFER_SIZE (64 * 1024)         // UART专用缓冲区
 #define RAW_BUFFER_SIZE (512 * 1024)         //  原始数据临时缓冲区
 #define STATUS_BUFFER_SIZE (16 * 1024)       // 状态响应缓冲区
 
@@ -108,6 +109,19 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_PWM].cs);
             
             // debug_printf("分发PWM数据: %d字节, cmd_id=%d, device_index=%d", pwm_data_len, header->cmd_id, header->device_index);
+        } else if (header->protocol_type == PROTOCOL_UART) {
+            // 处理UART响应数据
+            unsigned char* uart_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
+            int uart_data_len = header->data_len;
+            
+            debug_printf("收到UART数据: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
+                        header->protocol_type, header->cmd_id, header->device_index, uart_data_len);
+            
+            EnterCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
+            write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_UART], uart_data, uart_data_len);
+            LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
+            
+            debug_printf("分发UART数据: %d字节, cmd_id=%d, device_index=%d", uart_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_GPIO) {
             if (header->cmd_id == GPIO_DIR_READ && header->data_len >= 1) {
                 unsigned char level = *(raw_data + pos + sizeof(GENERIC_CMD_HEADER));
@@ -406,6 +420,14 @@ int usb_middleware_open_device(const char* serial) {
     pwm_rb->data_size = 0;
     InitializeCriticalSection(&pwm_rb->cs);
     
+    ring_buffer_t* uart_rb = &g_devices[slot].protocol_buffers[PROTOCOL_UART];
+    uart_rb->size = UART_BUFFER_SIZE;
+    uart_rb->buffer = (unsigned char*)malloc(UART_BUFFER_SIZE);
+    uart_rb->write_pos = 0;
+    uart_rb->read_pos = 0;
+    uart_rb->data_size = 0;
+    InitializeCriticalSection(&uart_rb->cs);
+    
     ring_buffer_t* status_rb = &g_devices[slot].protocol_buffers[PROTOCOL_STATUS];
     status_rb->size = STATUS_BUFFER_SIZE;
     status_rb->buffer = (unsigned char*)malloc(STATUS_BUFFER_SIZE);
@@ -511,6 +533,15 @@ int usb_middleware_close_device(int device_id) {
     }
     LeaveCriticalSection(&pwm_rb->cs);
     DeleteCriticalSection(&pwm_rb->cs);
+    
+    ring_buffer_t* uart_rb = &g_devices[slot].protocol_buffers[PROTOCOL_UART];
+    EnterCriticalSection(&uart_rb->cs);
+    if (uart_rb->buffer) {
+        free(uart_rb->buffer);
+        uart_rb->buffer = NULL;
+    }
+    LeaveCriticalSection(&uart_rb->cs);
+    DeleteCriticalSection(&uart_rb->cs);
     
     ring_buffer_t* status_rb = &g_devices[slot].protocol_buffers[PROTOCOL_STATUS];
     EnterCriticalSection(&status_rb->cs);
@@ -737,6 +768,42 @@ int usb_middleware_read_status_data(int device_id, unsigned char* data, int leng
     }
     
     LeaveCriticalSection(&status_rb->cs);
+    return to_read;
+}
+
+int usb_middleware_read_uart_data(int device_id, unsigned char* data, int length) {
+    if (!g_initialized || !data || length <= 0) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int slot = -1;
+    for (int i = 0; i < MAX_DEVICES; i++) {
+        if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == -1) {
+        debug_printf("设备未找到或未打开: %d", device_id);
+        return USB_ERROR_NOT_FOUND;
+    }
+    usb_middleware_update_device_access(device_id);
+    ring_buffer_t* uart_rb = &g_devices[slot].protocol_buffers[PROTOCOL_UART];
+    EnterCriticalSection(&uart_rb->cs);
+    int available = uart_rb->data_size;
+    int to_read = (available < length) ? available : length;
+    if (to_read > 0) {
+        if (uart_rb->read_pos + to_read <= uart_rb->size) {
+            memcpy(data, uart_rb->buffer + uart_rb->read_pos, to_read);
+        } else {
+            int first_part = uart_rb->size - uart_rb->read_pos;
+            memcpy(data, uart_rb->buffer + uart_rb->read_pos, first_part);
+            memcpy(data + first_part, uart_rb->buffer, to_read - first_part);
+        }
+        uart_rb->read_pos = (uart_rb->read_pos + to_read) % uart_rb->size;
+        uart_rb->data_size -= to_read;
+    }
+    LeaveCriticalSection(&uart_rb->cs);
+    
     return to_read;
 }
 

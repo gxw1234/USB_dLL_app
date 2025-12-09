@@ -99,6 +99,9 @@ int usb_middleware_read_data(int device_id, unsigned char* data, int length);
 
 int usb_middleware_read_spi_data(int device_id, unsigned char* data, int length);
 
+// UART数据读取函数
+int usb_middleware_read_uart_data(int device_id, unsigned char* data, int length);
+
 // GPIO电平等待获取（从数组中取），timeout_ms毫秒
 int usb_middleware_wait_gpio_level(int device_id, int gpio_index, unsigned char* level, int timeout_ms);
 

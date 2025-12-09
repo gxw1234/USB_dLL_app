@@ -23,6 +23,7 @@ SRCS=(
   usb_gpio.c
   usb_i2s.c
   usb_pwm.c
+  usb_uart.c
   usb_audil.c
 )
 
