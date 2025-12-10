@@ -117,6 +117,14 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             debug_printf("收到UART数据: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, uart_data_len);
             
+            // 调试：打印UART数据的前16字节（或全部数据如果少于16字节）
+            int print_len = (uart_data_len > 16) ? 16 : uart_data_len;
+            debug_printf("UART数据内容[前%d字节]: ", print_len);
+            for (int i = 0; i < print_len; i++) {
+                debug_printf("%02X ", uart_data[i]);
+            }
+            debug_printf("\n");
+            
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_UART], uart_data, uart_data_len);
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
@@ -801,10 +809,51 @@ int usb_middleware_read_uart_data(int device_id, unsigned char* data, int length
         }
         uart_rb->read_pos = (uart_rb->read_pos + to_read) % uart_rb->size;
         uart_rb->data_size -= to_read;
+        
+        // 调试：打印读取到的UART数据
+        debug_printf("UART_ReadBytes: 读取%d字节, 缓冲区剩余%d字节", to_read, uart_rb->data_size);
+        int print_len = (to_read > 16) ? 16 : to_read;
+        debug_printf("读取内容[前%d字节]: ", print_len);
+        for (int i = 0; i < print_len; i++) {
+            debug_printf("%02X ", data[i]);
+        }
+        debug_printf("\n");
     }
     LeaveCriticalSection(&uart_rb->cs);
     
     return to_read;
+}
+
+int usb_middleware_clear_uart_buffer(int device_id) {
+    if (!g_initialized) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    int slot = -1;
+    for (int i = 0; i < MAX_DEVICES; i++) {
+        if (g_devices[i].device_id == device_id && g_devices[i].state == DEVICE_STATE_OPEN) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        debug_printf("设备未找到或未打开: %d", device_id);
+        return USB_ERROR_NOT_FOUND;
+    }
+    
+    usb_middleware_update_device_access(device_id);
+    ring_buffer_t* uart_rb = &g_devices[slot].protocol_buffers[PROTOCOL_UART];
+    
+    EnterCriticalSection(&uart_rb->cs);
+    // 清空UART缓冲区
+    uart_rb->read_pos = 0;
+    uart_rb->write_pos = 0;
+    uart_rb->data_size = 0;
+    LeaveCriticalSection(&uart_rb->cs);
+    
+    debug_printf("成功清除UART缓冲区，设备ID: %d", device_id);
+    return USB_SUCCESS;
 }
 
 int usb_middleware_wait_gpio_level(int device_id, int gpio_index, unsigned char* level, int timeout_ms) {

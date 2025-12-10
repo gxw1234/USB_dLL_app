@@ -115,3 +115,29 @@ WINAPI int UART_WriteBytes(const char* target_serial, int uart_index, unsigned c
         return USB_ERROR_OTHER;
     }
 }
+
+WINAPI int UART_ClearData(const char* target_serial, int uart_index) {
+    debug_printf("UART_ClearData开始执行");
+    if (!target_serial) {
+        debug_printf("参数无效: target_serial=%p", target_serial);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    if (uart_index < 1 || uart_index > 4) {
+        debug_printf("UART索引无效: %d (有效范围: 1-4)", uart_index);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int device_id = usb_middleware_find_device_by_serial(target_serial);
+    if (device_id < 0) {
+        debug_printf("设备未打开: %s", target_serial);
+        return USB_ERROR_OTHER;
+    }
+    debug_printf("清除PC端UART缓冲区，UART索引: %d", uart_index);
+    int ret = usb_middleware_clear_uart_buffer(device_id);
+    if (ret == USB_SUCCESS) {
+        debug_printf("成功清除PC端UART缓冲区，UART索引: %d", uart_index);
+        return USB_SUCCESS;
+    } else {
+        debug_printf("清除PC端UART缓冲区失败: %d", ret);
+        return ret;
+    }
+}

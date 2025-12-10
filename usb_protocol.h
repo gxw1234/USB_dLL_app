@@ -34,6 +34,7 @@
 #define CMD_QUEUE_START    0x06    // 队列状态查询命令    
 #define CMD_QUEUE_STOP    0x07    // 队列状态查询命令
 #define CMD_QUEUE_WRITE           0x08    // 写数据命令
+#define CMD_CLEAR           0x09    // 清除缓冲区命令
 
 //----结束符------------
 #define CMD_END_MARKER      0xA5A5A5A5 // 命令包结束符

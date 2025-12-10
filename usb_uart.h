@@ -48,6 +48,12 @@ WINAPI int UART_ReadBytes(const char* target_serial, int uart_index, unsigned ch
 // @return 成功返回USB_SUCCESS，失败返回错误码
 WINAPI int UART_WriteBytes(const char* target_serial, int uart_index, unsigned char* pWriteBuffer, int WriteLen);
 
+// UART清除缓冲区数据
+// @param target_serial 设备序列号
+// @param uart_index UART索引 (1对应USART3/PD8/PD9)
+// @return 成功返回USB_SUCCESS，失败返回错误码
+WINAPI int UART_ClearData(const char* target_serial, int uart_index);
+
 #ifdef __cplusplus
 }
 #endif
