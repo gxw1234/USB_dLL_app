@@ -164,7 +164,6 @@ def main():
                         # 显示进度
                         progress = (i + 1) / len(data_packets) * 100
                         print(f"进度: {i + 1}/{len(data_packets)} ({progress:.1f}%) - 包大小: {len(packet)} 字节")
-
                 end_time = time.time()
                 total_time = end_time - start_time
                 total_bytes = len(firmware_data)

@@ -90,7 +90,11 @@ class I2S_CONFIG(Structure):
         ("AudioFreq", c_uint)       # 音频频率:8000,16000,22050,44100,48000,96000,192000
     ]
 
-def read_wav_file(file_path, chunk_size=16000):
+
+BUFFSIZE = 1280
+
+
+def read_wav_file(file_path, chunk_size=BUFFSIZE):
     """
     读取WAV音频文件并分块，跳过WAV文件头
     
@@ -230,6 +234,7 @@ def get_wav_info(file_path):
                                 chunk_duration_ms = (chunk_size // bytes_per_sample) / sample_rate * 1000
                                 total_chunks = (data_chunk_size + chunk_size - 1) // chunk_size
                                 
+
                                 info = {
                                     'file_size': os.path.getsize(file_path),
                                     'data_size': data_chunk_size,
@@ -252,6 +257,23 @@ def get_wav_info(file_path):
     except Exception as e:
         print(f"解析WAV文件时发生错误: {e}")
         return None
+
+
+
+
+class DeviceInfoDetail(Structure):
+    _fields_ = [
+        ("FirmwareName", c_char * 32),  # 固件名称字符串
+        ("BuildDate", c_char * 32),  # 固件编译时间字符串
+        ("HardwareVersion", c_int),  # 硬件版本号
+        ("FirmwareVersion", c_int),  # 固件版本号
+        ("SerialNumber", c_int * 3),  # 适配器序列号
+        ("Functions", c_int)  # 适配器当前具备的功能
+    ]
+
+
+
+
 
 def main():
     # 当前目录
@@ -306,97 +328,95 @@ def main():
         i2s_config.MCLKOutput = I2S_MCLKOUTPUT_ENABLE  # 启用MCLK输出
         i2s_config.AudioFreq = I2S_AUDIOFREQ_16K    # 16kHz采样率
         # i2s_config.AudioFreq = I2S_AUDIOFREQ_48K    # 48kHz采样率
-
         i2s_init_result = usb_application.I2S_Init(serial_param, I2S_INDEX_1, byref(i2s_config))
-        time.sleep(0.5)
-        if i2s_init_result != I2S_SUCCESS:
-            print(f"I2S初始化失败，错误代码: {i2s_init_result}")
-            return
 
-        wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\R.wav"
-        # wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\48_xl.wav"
-        print(f"使用固定WAV文件: {wav_file_path}")
-        if not os.path.exists(wav_file_path):
-            print(f"错误: WAV文件不存在: {wav_file_path}")
-            return
-        wav_info = get_wav_info(wav_file_path)
-        if wav_info:
-            print(f"\nWAV文件信息:")
-            print(f"  文件大小: {wav_info['file_size']} 字节")
-            print(f"  数据大小: {wav_info['data_size']} 字节")
-            print(f"  采样率: {wav_info['sample_rate']} Hz")
-            print(f"  声道数: {wav_info['channels']}")
-            print(f"  位深度: {wav_info['bit_depth']} 位")
-            print(f"  音频格式: {wav_info['audio_format']}")
-            print(f"  总时长: {wav_info['duration_seconds']:.2f} 秒")
-            print(f"  音频块数: {wav_info['total_chunks']}")
-            print(f"  每块时长: {wav_info['chunk_duration_ms']:.1f} 毫秒")
 
-        print(f"\n读取WAV文件: {os.path.basename(wav_file_path)}")
-        audio_chunks = read_wav_file(wav_file_path)
+        print("\n获取设备详细信息...")
+        dev_info = DeviceInfoDetail()
+        func_str = create_string_buffer(256)  # 创建功能字符串缓冲区
 
-        if not audio_chunks:
-            print("读取WAV文件失败")
-            return
+        time.sleep(1)
+        if 1:
+            if i2s_init_result != I2S_SUCCESS:
+                print(f"I2S初始化失败，错误代码: {i2s_init_result}")
+                return
+            wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\R.wav"
+            # wav_file_path = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\48_xl.wav"
+            print(f"使用固定WAV文件: {wav_file_path}")
+            if not os.path.exists(wav_file_path):
+                print(f"错误: WAV文件不存在: {wav_file_path}")
+                return
+            wav_info = get_wav_info(wav_file_path)
+            if wav_info:
+                print(f"\nWAV文件信息:")
+                print(f"  文件大小: {wav_info['file_size']} 字节")
+                print(f"  数据大小: {wav_info['data_size']} 字节")
+                print(f"  采样率: {wav_info['sample_rate']} Hz")
+                print(f"  声道数: {wav_info['channels']}")
+                print(f"  位深度: {wav_info['bit_depth']} 位")
+                print(f"  音频格式: {wav_info['audio_format']}")
+                print(f"  总时长: {wav_info['duration_seconds']:.2f} 秒")
+                print(f"  音频块数: {wav_info['total_chunks']}")
+                print(f"  每块时长: {wav_info['chunk_duration_ms']:.1f} 毫秒")
 
-        print(f"成功读取 {len(audio_chunks)} 个音频块")
+            print(f"\n读取WAV文件: {os.path.basename(wav_file_path)}")
+            audio_chunks = read_wav_file(wav_file_path)
 
-        print("启动I2S音频队列...")
-        usb_application.I2S_SetVolume(serial_param, I2S_INDEX_1, 10)
-        queue_start_result = usb_application.I2S_StartQueue(serial_param, I2S_INDEX_1)
-        if queue_start_result != I2S_SUCCESS:
-            print(f"启动I2S队列失败，错误代码: {queue_start_result}")
-            return
+            if not audio_chunks:
+                print("读取WAV文件失败")
+                return
 
-        write_buffer_size = 10
-        write_buffer = (c_ubyte * write_buffer_size)()
-        for i in range(write_buffer_size):
-            write_buffer[i] = i
-        print("开始WAV音频传输...")
-        # 先发送前8个音频块，让队列有数据持续播放
-        initial_chunks = min(8, len(audio_chunks))
-        print(f"预填充音频队列 (前{initial_chunks}个音频块)...")
-        for i in range(initial_chunks):
-            ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]) )
-            if ret == 0:
-                print(f"成功发送第 {i+1} 个音频块")
-            else:
-                print(f"发送第 {i+1} 个音频块失败，状态码: {ret}")
-        #发送剩余的音频块
-        remaining_chunks = len(audio_chunks) - initial_chunks
-        if remaining_chunks > 0:
-            print(f"发送剩余的 {remaining_chunks} 个音频块...")
-            for i in range(initial_chunks, len(audio_chunks)):
-                # 检查队列状态，如果大于7就等待
-                while True:
-                    queue_status = usb_application.I2S_GetQueueStatus(serial_param, I2S_INDEX_1)
-                    if 0 <= queue_status <= 7:
-                        break  # 队列有空间，可以发送
-                    elif queue_status > 7:
-                        time.sleep(0.01)  # 队列满，等待10ms
-                    else:
-                        print(f"队列状态查询失败: {queue_status}")
-                        break
-                # 发送音频块
+            print(f"成功读取 {len(audio_chunks)} 个音频块")
+
+            print("启动I2S音频队列...")
+            usb_application.I2S_SetVolume(serial_param, I2S_INDEX_1, 10)
+            queue_start_result = usb_application.I2S_StartQueue(serial_param, I2S_INDEX_1)
+            if queue_start_result != I2S_SUCCESS:
+                print(f"启动I2S队列失败，错误代码: {queue_start_result}")
+                return
+
+            write_buffer_size = 10
+            write_buffer = (c_ubyte * write_buffer_size)()
+            for i in range(write_buffer_size):
+                write_buffer[i] = i
+            print("开始WAV音频传输...")
+            # 先发送前8个音频块，让队列有数据持续播放
+            initial_chunks = min(8, len(audio_chunks))
+            print(f"预填充音频队列 (前{initial_chunks}个音频块)...")
+
+            for i in range(initial_chunks):
                 ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]) )
-                if ret == 0:
-                    if (i + 1) % 50 == 0 or i == len(audio_chunks) - 1:
-                        print(f"成功发送第 {i+1} 个音频块")
-                else:
-                    print(f"发送第 {i+1} 个音频块失败，状态码: {ret}")
-        # 等待音频队列完全播放完成
-        print("等待WAV音频播放完成...")
-        empty_count = 0
-        # while True:
-        #     queue_status = usb_application.I2S_GetQueueStatus(serial_param, I2S_INDEX_1)
-        #     if queue_status == 0:
-        #         empty_count += 1
-        #         if empty_count >= 3:  # 连续3次为空，播放完成
-        #             break
-        #     else:
-        #         empty_count = 0
-        #     time.sleep(0.05)  # 50ms检查一次
-        print("WAV音频播放完成")
+            #发送剩余的音频块
+            queue_status = usb_application.I2S_GetQueueStatus(serial_param, I2S_INDEX_1)
+            # time.sleep(1)
+            print(f'--------------queue_status:{queue_status}')
+            remaining_chunks = len(audio_chunks) - initial_chunks
+
+            if 1:
+                if remaining_chunks > 0:
+                    print(f"发送剩余的 {remaining_chunks} 个音频块...")
+                    for i in range(initial_chunks, len(audio_chunks)):
+                        # 检查队列状态，如果大于7就等待
+                        while True:
+                            queue_status = usb_application.I2S_GetQueueStatus(serial_param, I2S_INDEX_1)
+                            if 0 <= queue_status <= 7:
+                                break  # 队列有空间，可以发送
+                            elif queue_status > 7:
+                                time.sleep(0.01)  # 队列满，等待10ms
+                            else:
+                                print(f"队列状态查询失败: {queue_status}")
+                                break
+                        # 发送音频块
+                        ret = usb_application.I2S_Queue_WriteBytes(serial_param, I2S_INDEX_1, audio_chunks[i], len(audio_chunks[i]) )
+                        if ret == 0:
+                            if (i + 1) % 50 == 0 or i == len(audio_chunks) - 1:
+                                print(f"成功发送第 {i+1} 个音频块")
+                        else:
+                            print(f"发送第 {i+1} 个音频块失败，状态码: {ret}")
+                # 等待音频队列完全播放完成
+                print("等待WAV音频播放完成...")
+
+            print("WAV音频播放完成")
     except Exception as e:
         print(f"音频传输过程中发生错误: {e}")
     finally:

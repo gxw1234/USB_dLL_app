@@ -132,6 +132,8 @@ def main():
     serial_param = serial_str.encode('utf-8')
     handle = usb_application.USB_OpenDevice(serial_param)
     time.sleep(1)
+
+    usb_application.USB_SetLogging(1)
     if handle < 0:
         print(f"设备打开失败，错误代码: {handle}")
         return
@@ -155,7 +157,6 @@ def main():
             print(f'设备打开成功')
     except:
         pass
-
     try:
         # 双路音频文件路径
         left_audio_file = r"D:\STM32OBJ\usb_test_obj\test_1\stm32h750ibt6\dox\16K_L.wav"

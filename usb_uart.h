@@ -54,6 +54,21 @@ WINAPI int UART_WriteBytes(const char* target_serial, int uart_index, unsigned c
 // @return 成功返回USB_SUCCESS，失败返回错误码
 WINAPI int UART_ClearData(const char* target_serial, int uart_index);
 
+// 简化的字符串发送接口 - 用户友好
+// @param target_serial 设备序列号
+// @param uart_index UART索引 (1对应USART3/PD8/PD9)
+// @param text 要发送的字符串
+// @return 成功返回USB_SUCCESS，失败返回错误码
+WINAPI int UART_SendString(const char* target_serial, int uart_index, const char* text);
+
+// 简化的字符串接收接口 - 用户友好
+// @param target_serial 设备序列号
+// @param uart_index UART索引 (1对应USART3/PD8/PD9)
+// @param buffer 接收缓冲区
+// @param buffer_size 缓冲区大小
+// @return 成功返回实际读取字节数，失败返回负数错误码
+WINAPI int UART_ReadString(const char* target_serial, int uart_index, char* buffer, int buffer_size);
+
 #ifdef __cplusplus
 }
 #endif

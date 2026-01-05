@@ -51,8 +51,18 @@ WAV_DATA_HEADER;
 #pragma pack(pop)
 #endif
 
+// 全局音频进度回调
+static AudioProgressCallback g_audio_progress_callback = NULL;
+static void* g_audio_user_data = NULL;
+
+// 注册音频进度回调
+WINAPI void AudioSetProgressCallback(AudioProgressCallback callback, void* user_data) {
+    g_audio_progress_callback = callback;
+    g_audio_user_data = user_data;
+}
+
 // 简化的音频播放接口
-WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
+WINAPI int AudioStart(const char* target_serial, const char* wav_file_path, int volume) {
     FILE* file = NULL;
     unsigned char** audio_chunks = NULL;
     unsigned int chunk_count = 0;
@@ -70,6 +80,7 @@ WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
     WAV_RIFF_HEADER riff_header;
     WAV_FMT_CHUNK fmt_chunk;
     unsigned int sample_rate = 16000; // 默认采样率
+    unsigned short channels = 2;      // 默认双声道
 
     // 读取RIFF头
     if (fread(&riff_header, sizeof(riff_header), 1, file) != 1) {
@@ -95,6 +106,7 @@ WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
             // 读取格式信息
             if (fread(&fmt_chunk.audio_format, chunk_size, 1, file) == 1) {
                 sample_rate = fmt_chunk.sample_rate;
+                channels = fmt_chunk.channels;
             }
         } else if (memcmp(chunk_id, "data", 4) == 0) {
             // 找到数据块
@@ -111,42 +123,96 @@ WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
         return AUDIO_ERROR_INVALID_FORMAT;
     }
 
-    // 计算音频块数量 (使用16000字节块大小，与audio_temp.py保持一致)
-    const unsigned int CHUNK_SIZE = 16000;
-    chunk_count = (data_size + CHUNK_SIZE - 1) / CHUNK_SIZE; // 向上取整
+    debug_printf("音频格式: %d声道, 采样率=%d Hz", channels, sample_rate);
+
+    const unsigned int CHUNK_SIZE = 1280;
+    unsigned char* mono_buffer = NULL;
+    unsigned int stereo_data_size = data_size;
     
-    // 分配音频块内存
-    audio_chunks = (unsigned char**)malloc(chunk_count * sizeof(unsigned char*));
-    if (!audio_chunks) {
+    // 如果是单声道，需要转换为双声道
+    if (channels == 1) {
+        debug_printf("检测到单声道音频，转换为双声道...");
+        stereo_data_size = data_size * 2;  // 双声道数据量翻倍
+        
+        // 读取全部单声道数据
+        mono_buffer = (unsigned char*)malloc(data_size);
+        if (!mono_buffer) {
+            fclose(file);
+            return AUDIO_ERROR_OTHER;
+        }
+        fread(mono_buffer, 1, data_size, file);
         fclose(file);
-        return AUDIO_ERROR_OTHER;
+        file = NULL;
+        
+        // 分配双声道缓冲区
+        unsigned char* stereo_buffer = (unsigned char*)malloc(stereo_data_size);
+        if (!stereo_buffer) {
+            free(mono_buffer);
+            return AUDIO_ERROR_OTHER;
+        }
+        
+        // 单声道转双声道：每个样本复制到左右声道
+        short* mono_samples = (short*)mono_buffer;
+        short* stereo_samples = (short*)stereo_buffer;
+        unsigned int mono_sample_count = data_size / 2;
+        for (unsigned int i = 0; i < mono_sample_count; i++) {
+            stereo_samples[i * 2] = mono_samples[i];     // 左声道
+            stereo_samples[i * 2 + 1] = mono_samples[i]; // 右声道
+        }
+        free(mono_buffer);
+        mono_buffer = stereo_buffer;  // 复用指针
     }
 
-    // 读取音频数据并分块
+    chunk_count = (stereo_data_size + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    audio_chunks = (unsigned char**)malloc(chunk_count * sizeof(unsigned char*));
+    if (!audio_chunks) {
+        if (file) fclose(file);
+        if (channels == 1 && mono_buffer) free(mono_buffer);
+        return AUDIO_ERROR_OTHER;
+    }
+    
     for (unsigned int i = 0; i < chunk_count; i++) {
         audio_chunks[i] = (unsigned char*)malloc(CHUNK_SIZE);
         if (!audio_chunks[i]) {
-            // 清理已分配的内存
             for (unsigned int j = 0; j < i; j++) {
                 free(audio_chunks[j]);
             }
             free(audio_chunks);
-            fclose(file);
+            if (file) fclose(file);
+            if (channels == 1 && mono_buffer) free(mono_buffer);
             return AUDIO_ERROR_OTHER;
         }
-
-        size_t bytes_read = fread(audio_chunks[i], 1, CHUNK_SIZE, file);
+        
+        size_t bytes_read;
+        if (channels == 1) {
+            // 从转换后的双声道缓冲区复制
+            unsigned int offset = i * CHUNK_SIZE;
+            unsigned int copy_size = (offset + CHUNK_SIZE <= stereo_data_size) ? CHUNK_SIZE : (stereo_data_size - offset);
+            memcpy(audio_chunks[i], mono_buffer + offset, copy_size);
+            bytes_read = copy_size;
+        } else {
+            // 直接从文件读取双声道数据
+            bytes_read = fread(audio_chunks[i], 1, CHUNK_SIZE, file);
+        }
+        
         if (bytes_read < CHUNK_SIZE) {
-            // 最后一块不足16000字节，用零填充
             memset(audio_chunks[i] + bytes_read, 0, CHUNK_SIZE - bytes_read);
         }
+        
+        // 应用音量（volume=100时不调整）
+        if (volume != 100) {
+            short* samples = (short*)audio_chunks[i];
+            unsigned int sample_count = CHUNK_SIZE / 2;
+            float vol_factor = volume / 100.0f;
+            for (unsigned int j = 0; j < sample_count; j++) {
+                samples[j] = (short)(samples[j] * vol_factor);
+            }
+        }
     }
+    
+    if (file) fclose(file);
+    if (channels == 1 && mono_buffer) free(mono_buffer);
 
-    fclose(file);
-
-   
-
-    // 启动I2S队列
     ret = I2S_StartQueue(target_serial, 1);
     if (ret != I2S_SUCCESS) {
         debug_printf("启动I2S队列失败，错误代码: %d", ret);
@@ -159,16 +225,14 @@ WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
 
     debug_printf("开始WAV音频传输...");
     
-    // 预填充8个音频块，让队列有数据持续播放
     unsigned int initial_chunks = (chunk_count < 8) ? chunk_count : 8;
     debug_printf("预填充音频队列 (前%d个音频块)...", initial_chunks);
     for (unsigned int i = 0; i < initial_chunks; i++) {
         int write_ret = I2S_Queue_WriteBytes(target_serial, 1, audio_chunks[i], CHUNK_SIZE);
-        // if (write_ret == 0) {
-        //     printf("成功发送第 %d 个音频块\n", i + 1);
-        // } else {
-        //     printf("发送第 %d 个音频块失败，状态码: %d\n", i + 1, write_ret);
-        // }
+        // 调用进度回调
+        if (g_audio_progress_callback) {
+            g_audio_progress_callback(i + 1, chunk_count, g_audio_user_data);
+        }
     }
 
     // 发送剩余音频块 - 动态流控制
@@ -190,6 +254,10 @@ WINAPI int AudioStart(const char* target_serial, const char* wav_file_path) {
             }
             // 发送音频块
             int write_ret = I2S_Queue_WriteBytes(target_serial, 1, audio_chunks[i], CHUNK_SIZE);
+            // 调用进度回调
+            if (g_audio_progress_callback) {
+                g_audio_progress_callback(i + 1, chunk_count, g_audio_user_data);
+            }
             if (write_ret == 0) {
                 if ((i + 1) % 50 == 0 || i == chunk_count - 1) {
                     debug_printf("成功发送第 %d 个音频块", i + 1);

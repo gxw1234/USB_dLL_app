@@ -141,3 +141,37 @@ WINAPI int UART_ClearData(const char* target_serial, int uart_index) {
         return ret;
     }
 }
+
+
+WINAPI int UART_SendString(const char* target_serial, int uart_index, const char* text) {
+    if (!target_serial || !text) {
+        debug_printf("参数无效: target_serial=%p, text=%p", target_serial, text);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    int len = strlen(text);
+    if (len == 0 || len > 1024) {
+        debug_printf("字符串长度无效: %d (范围: 1-1024)", len);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    
+    debug_printf("发送字符串: '%s' (%d字节)", text, len);
+    return UART_WriteBytes(target_serial, uart_index, (unsigned char*)text, len);
+}
+
+
+WINAPI int UART_ReadString(const char* target_serial, int uart_index, char* buffer, int buffer_size) {
+    if (!target_serial || !buffer || buffer_size <= 1) {
+        debug_printf("参数无效: target_serial=%p, buffer=%p, buffer_size=%d", target_serial, buffer, buffer_size);
+        return USB_ERROR_INVALID_PARAM;
+    }
+    int max_read = buffer_size - 1;
+    int result = UART_ReadBytes(target_serial, uart_index, (unsigned char*)buffer, max_read);
+    
+    if (result >= 0) {
+        buffer[result] = '\0';  
+        debug_printf("读取字符串: '%s' (%d字节)", buffer, result);
+    }
+    
+    return result;
+}

@@ -15,7 +15,7 @@
 
 #define MAX_DEVICES 10
 #define SPI_BUFFER_SIZE (10 * 1024 * 1024)    // SPI专用缓冲区
-#define POWER_BUFFER_SIZE (512 * 1024)       // 电源数据缓冲区 (增大以适应电流数据)
+#define POWER_BUFFER_SIZE (512 * 1024)       // 电源数据缓冲区 
 #define PWM_BUFFER_SIZE (4 * 1024)           // PWM专用缓冲区
 #define UART_BUFFER_SIZE (64 * 1024)         // UART专用缓冲区
 #define RAW_BUFFER_SIZE (512 * 1024)         //  原始数据临时缓冲区
@@ -116,14 +116,6 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
             
             debug_printf("收到UART数据: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, uart_data_len);
-            
-            // 调试：打印UART数据的前16字节（或全部数据如果少于16字节）
-            int print_len = (uart_data_len > 16) ? 16 : uart_data_len;
-            debug_printf("UART数据内容[前%d字节]: ", print_len);
-            for (int i = 0; i < print_len; i++) {
-                debug_printf("%02X ", uart_data[i]);
-            }
-            debug_printf("\n");
             
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_UART], uart_data, uart_data_len);
@@ -809,15 +801,6 @@ int usb_middleware_read_uart_data(int device_id, unsigned char* data, int length
         }
         uart_rb->read_pos = (uart_rb->read_pos + to_read) % uart_rb->size;
         uart_rb->data_size -= to_read;
-        
-        // 调试：打印读取到的UART数据
-        debug_printf("UART_ReadBytes: 读取%d字节, 缓冲区剩余%d字节", to_read, uart_rb->data_size);
-        int print_len = (to_read > 16) ? 16 : to_read;
-        debug_printf("读取内容[前%d字节]: ", print_len);
-        for (int i = 0; i < print_len; i++) {
-            debug_printf("%02X ", data[i]);
-        }
-        debug_printf("\n");
     }
     LeaveCriticalSection(&uart_rb->cs);
     

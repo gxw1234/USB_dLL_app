@@ -5,7 +5,7 @@
 UART功能测试脚本
 测试UART初始化功能
 """
-
+from datetime import datetime
 import os
 import ctypes
 import time
@@ -94,7 +94,6 @@ def test_uart_read_continuous(usb_application, target_serial):
     uart_index = 1
     buffer_size = 256
     read_buffer = (ctypes.c_ubyte * buffer_size)()
-    
     try:
         while True:
             # ===================================================
@@ -118,21 +117,23 @@ def test_uart_read_continuous(usb_application, target_serial):
             
             # 添加调试信息
             if result > 0:
-
-                # 将读取到的数据转换为字节数组
-                data = bytes(read_buffer[:result])
-                
-                # 显示接收到的数据
-                print(f"[{time.strftime('%H:%M:%S')}] 接收到 {result} 字节:")
-                
-                # 显示十六进制格式
-                hex_str = ' '.join([f'{b:02X}' for b in data])
-                print(f"  HEX: {hex_str}")
-                
-                # 显示ASCII格式（可打印字符）
-                ascii_str = ''.join([chr(b) if 32 <= b < 127 else '.' for b in data])
-                print(f"  ASCII: '{ascii_str}'")
-                
+                current_timestamp = datetime.now().timestamp()
+                print(f'result: {result}, timestamp: {current_timestamp}')
+                #
+                # # 将读取到的数据转换为字节数组
+                # data = bytes(read_buffer[:result])
+                #
+                # # 显示接收到的数据
+                # print(f"[{time.strftime('%H:%M:%S')}] 接收到 {result} 字节:")
+                #
+                # # 显示十六进制格式
+                # hex_str = ' '.join([f'{b:02X}' for b in data])
+                # print(f"  HEX: {hex_str}")
+                #
+                # # 显示ASCII格式（可打印字符）
+                # ascii_str = ''.join([chr(b) if 32 <= b < 127 else '.' for b in data])
+                # print(f"  ASCII: '{ascii_str}'")
+                #
             elif result < 0:
                 print(f"读取数据失败，错误代码: {result}")
                 break
@@ -207,12 +208,30 @@ def main():
         return
     
     print("设备打开成功!")
-    
+    usb_application.USB_SetLogging(1)
     try:
         # 执行UART测试
         if test_uart_init(usb_application, target_serial):
             # UART初始化成功，开始持续读取数据
-            test_uart_read_continuous(usb_application, target_serial)
+            # test_uart_read_continuous(usb_application, target_serial)
+
+
+
+            test_data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            send_buffer = (ctypes.c_ubyte * 10)(*test_data)
+            
+            result = usb_application.UART_WriteBytes(
+                target_serial.encode('utf-8'),
+                1,
+                send_buffer,
+                10
+            )
+
+
+            if result == USB_SUCCESS:
+                print(f"发送10字节数据成功: ")
+            else:
+                print(f"发送失败，错误码: {result}")
         else:
             print("UART初始化失败，跳过数据读取测试")
         
