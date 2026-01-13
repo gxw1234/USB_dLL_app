@@ -99,7 +99,21 @@ def main():
         print("\n测试电压设置功能...")
         POWER_CHANNEL_1 = 0x01
         POWER_SUCCESS = 0
-        voltage_mv = 3300
+        voltage_mv = 5000
+        usb_application.POWER_StartTestMode.argtypes = [c_char_p, c_ubyte]
+        usb_application.POWER_StartTestMode.restype = c_int
+        st_result = usb_application.POWER_StartTestMode(serial_param, POWER_CHANNEL_1)
+        if st_result == POWER_SUCCESS:
+            print("已启动POWER测试模式")
+        else:
+            print(f"启动POWER测试模式失败，错误代码: {st_result}")
+        usb_application.POWER_PowerOn.argtypes = [c_char_p, c_ubyte]
+        usb_application.POWER_PowerOn.restype = c_int
+        power_on_ret = usb_application.POWER_PowerOn(serial_param, POWER_CHANNEL_1)
+        if power_on_ret == POWER_SUCCESS:
+            print("电源已打开")
+        else:
+            print(f"电源打开失败，错误代码: {power_on_ret}")
         
         # ===================================================
         # 函数: POWER_SetVoltage
@@ -116,71 +130,80 @@ def main():
         usb_application.POWER_SetVoltage.argtypes = [c_char_p, c_ubyte, c_ushort]
         usb_application.POWER_SetVoltage.restype = c_int
         print(f"设置电压: 通道={POWER_CHANNEL_1}, 电压={voltage_mv}mV")
-        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, 186)
+        power_result = usb_application.POWER_SetVoltage(serial_param, POWER_CHANNEL_1, voltage_mv)
         if power_result == POWER_SUCCESS:
             print(f"成功发送设置电压命令，")
         else:
             print(f"设置电压失败，错误代码: {power_result}")
         time.sleep(1)
 
-        # power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
-        # if power_result == POWER_SUCCESS:
-        #     print(f"开始读取")
-        # else:
-        #     print(f"开始，错误代码: {power_result}")
-        #
-        # time.sleep(5)
-        # buffer_size = 102400
-        # buffer = (c_ubyte * buffer_size)()
-        # print("尝试读取数据...")
-        # ===================================================
-        # 函数: USB_ReadData
-        # 描述: 从USB设备读取数据
-        # 参数:
-        #   serial_param: 设备序列号
-        #   buffer: 数据缓冲区，用于存储读取到的数据
-        #   buffer_size: 要读取的数据长度(字节)
-        # 返回值:
-        #   >0: 实际读取到的数据长度
-        #   =0: 超时，未读取到数据
-        #   <0: 读取失败，返回错误代码
-        # ===================================================
+        power_result = usb_application.POWER_StartCurrentReading(serial_param, POWER_CHANNEL_1)
+        if power_result == POWER_SUCCESS:
+            print(f"开始读取")
+        else:
+            print(f"开始，错误代码: {power_result}")
 
-        # read_result = usb_application.USB_ReadData(serial_param, buffer, buffer_size)
-        # if read_result > 0:
-        #     print(f"成功读取 {read_result} 字节数据")
-        #     import struct
-        #     received_bytes = bytes(buffer[:read_result])
-        #     data_point_count = read_result // 5
-        #     print(f"解析到的电流数据:")
-        #     current_values = []
-        #     current_types = []
-        #     for i in range(min(data_point_count, 10)):
-        #         try:
-        #             base = i * 5
-        #             data_type = received_bytes[base]
-        #             current_value = struct.unpack('f', received_bytes[base+1:base+5])[0]  # 后4个字节是浮点数
-        #             current_values.append(current_value)
-        #             current_types.append(data_type)
-        #             unit = "uA" if data_type == 1 else "mA"  # 1表示微安，0表示毫安
-        #             print(f"  电流{i+1}: {current_value:.6f} {unit}")
-        #         except Exception as e:
-        #             print(f"  无法解析第{i+1}个电流值: {str(e)}")
-        #     print(f"共有{data_point_count}个数据点")
-        # elif read_result == 0:
-        #     print("超时，未读取到数据")
-        # else:
-        #     print(f"读取失败，错误代码: {read_result}")
-        #
-        #
-        #
-        # power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
-        # if power_result == POWER_SUCCESS:
-        #
-        #     print(f"停止读取")
-        # else:
-        #     print(f"停止读取，错误代码: {power_result}")
-        #
+        time.sleep(5)
+        buffer_size = 102400
+        buffer = (c_ubyte * buffer_size)()
+        print("尝试读取数据...")
+
+
+
+        for i in range(1000):
+            read_result = usb_application.POWER_ReadCurrentData(serial_param, POWER_CHANNEL_1, buffer, buffer_size)
+            if read_result > 0:
+                print(f"成功读取 {read_result} 字节数据")
+                import struct
+                sample_count = read_result // 4  # 每个float占4字节
+                if sample_count > 0:
+                    print(f"采样点数量: {sample_count}")
+                    max_value = float('-inf')
+                    min_value = float('inf')
+                    for i in range(sample_count):
+                        float_bytes = bytes(buffer[i * 4:(i + 1) * 4])
+                        current_value = struct.unpack('<f', float_bytes)[0]  # 小端序float
+                        if i < 10:
+                            print(f"采样点 {i + 1}: {current_value:.6f} mA")
+                        if current_value > max_value:
+                            max_value = current_value
+                        if current_value < min_value:
+                            min_value = current_value
+                    print(f"最大值: {max_value:.6f} mA")
+                    print(f"最小值: {min_value:.6f} mA")
+            elif read_result == 0:
+                print("超时，未读取到数据")
+            else:
+                print(f"读取失败，错误代码: {read_result}")
+            time.sleep(2)
+
+
+
+
+
+        power_result = usb_application.POWER_StopCurrentReading(serial_param, POWER_CHANNEL_1)
+        if power_result == POWER_SUCCESS:
+
+            print(f"停止读取")
+        else:
+            print(f"停止读取，错误代码: {power_result}")
+
+        usb_application.POWER_PowerOff.argtypes = [c_char_p, c_ubyte]
+        usb_application.POWER_PowerOff.restype = c_int
+        power_off_ret = usb_application.POWER_PowerOff(serial_param, POWER_CHANNEL_1)
+        if power_off_ret == POWER_SUCCESS:
+            print("电源已关闭")
+        else:
+            print(f"电源关闭失败，错误代码: {power_off_ret}")
+
+        usb_application.POWER_StopTestMode.argtypes = [c_char_p, c_ubyte]
+        usb_application.POWER_StopTestMode.restype = c_int
+        stop_st_result = usb_application.POWER_StopTestMode(serial_param, POWER_CHANNEL_1)
+        if stop_st_result == POWER_SUCCESS:
+            print("已停止POWER测试模式")
+        else:
+            print(f"停止POWER测试模式返回: {stop_st_result}")
+
 
 
         # ===================================================

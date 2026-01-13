@@ -62,6 +62,9 @@ typedef struct {
     void* read_thread;        
     int thread_running;       
     int stop_thread;           
+    unsigned char* rx_cache;
+    unsigned int rx_cache_size;
+    unsigned int rx_cache_capacity;
     ring_buffer_t protocol_buffers[MAX_PROTOCOL_TYPES]; 
     ring_buffer_t raw_buffer;  
     // GPIO电平缓存：按device_index存储最近一次读取的电平

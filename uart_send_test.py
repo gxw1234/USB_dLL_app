@@ -108,7 +108,6 @@ def test_uart_read_continuous(usb_application, target_serial):
         while True:
             # 创建接收缓冲区
             buffer = ctypes.create_string_buffer(256)
-            
             # ===================================================
             # 函数: UART_ReadString
             # 描述: 从UART缓冲区读取字符串数据

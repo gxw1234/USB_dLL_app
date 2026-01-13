@@ -26,6 +26,46 @@ static int g_device_count = 0;
 static int g_next_device_id = 0;
 static int g_initialized = 0;
 
+#define RX_CACHE_INITIAL_CAPACITY (64 * 1024)
+#define RX_CACHE_MAX_CAPACITY (1024 * 1024)
+
+static int ensure_rx_cache_capacity(device_handle_t* device, unsigned int required_capacity) {
+    if (!device) {
+        return USB_ERROR_INVALID_PARAM;
+    }
+    if (required_capacity <= device->rx_cache_capacity) {
+        return USB_SUCCESS;
+    }
+    unsigned int new_capacity = device->rx_cache_capacity ? device->rx_cache_capacity : RX_CACHE_INITIAL_CAPACITY;
+    while (new_capacity < required_capacity) {
+        new_capacity *= 2;
+        if (new_capacity > RX_CACHE_MAX_CAPACITY) {
+            new_capacity = RX_CACHE_MAX_CAPACITY;
+            break;
+        }
+    }
+    if (required_capacity > new_capacity) {
+        return USB_ERROR_OTHER;
+    }
+    unsigned char* new_buf = (unsigned char*)realloc(device->rx_cache, new_capacity);
+    if (!new_buf) {
+        return USB_ERROR_OTHER;
+    }
+    device->rx_cache = new_buf;
+    device->rx_cache_capacity = new_capacity;
+    return USB_SUCCESS;
+}
+
+static int is_valid_protocol_header(const GENERIC_CMD_HEADER* header) {
+    if (!header) {
+        return 0;
+    }
+    if (header->protocol_type < PROTOCOL_SPI || header->protocol_type > PROTOCOL_PWM) {
+        return 0;
+    }
+    return 1;
+}
+
 static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
     device_handle_t* device = (device_handle_t*)lpParameter;
     unsigned char temp_buffer[8192];  // 增加缓冲区大小以适应大数据包
@@ -47,84 +87,84 @@ static DWORD WINAPI usb_device_read_thread_func(LPVOID lpParameter) {
 }
 
 void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* raw_data, int length) {
-    int pos = 0;
-    while (pos < length) {
-        //检查是否有足够的字节来读取完整的协议头
-        if (pos + sizeof(GENERIC_CMD_HEADER) > length) {
+    if (!device || !raw_data || length <= 0) {
+        return;
+    }
 
-            EnterCriticalSection(&device->raw_buffer.cs);
-            write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
-            LeaveCriticalSection(&device->raw_buffer.cs);
+    if (device->rx_cache_size > RX_CACHE_MAX_CAPACITY) {
+        device->rx_cache_size = 0;
+    }
+
+    if (ensure_rx_cache_capacity(device, device->rx_cache_size + (unsigned int)length) != USB_SUCCESS) {
+        device->rx_cache_size = 0;
+        return;
+    }
+
+    memcpy(device->rx_cache + device->rx_cache_size, raw_data, (size_t)length);
+    device->rx_cache_size += (unsigned int)length;
+
+    while (device->rx_cache_size >= sizeof(GENERIC_CMD_HEADER)) {
+        GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)device->rx_cache;
+        if (!is_valid_protocol_header(header)) {
+            memmove(device->rx_cache, device->rx_cache + 1, device->rx_cache_size - 1);
+            device->rx_cache_size -= 1;
+            continue;
+        }
+
+        unsigned int packet_size = (unsigned int)sizeof(GENERIC_CMD_HEADER) + (unsigned int)header->data_len;
+        if (packet_size < sizeof(GENERIC_CMD_HEADER)) {
+            memmove(device->rx_cache, device->rx_cache + 1, device->rx_cache_size - 1);
+            device->rx_cache_size -= 1;
+            continue;
+        }
+
+        if (device->rx_cache_size < packet_size) {
             break;
         }
-        
-        GENERIC_CMD_HEADER* header = (GENERIC_CMD_HEADER*)(raw_data + pos);
-        int packet_size = sizeof(GENERIC_CMD_HEADER) + header->data_len;
 
-        // 检查是否有足够的字节来读取完整的数据包
-        if (pos + packet_size > length) {
+        unsigned char* packet_base = device->rx_cache;
 
-            EnterCriticalSection(&device->raw_buffer.cs);
-            write_to_ring_buffer(&device->raw_buffer, raw_data + pos, length - pos);
-            LeaveCriticalSection(&device->raw_buffer.cs);
-            break;
-        }
-        //检查是否有足够的字节来读取完整的数据包
-        
         if (header->protocol_type == PROTOCOL_SPI) {
-
-            unsigned char* spi_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
+            unsigned char* spi_data = packet_base + sizeof(GENERIC_CMD_HEADER);
             int spi_data_len = header->data_len;
-            //获取互斥锁，确保只有一个线程能访问共享资源
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
-            //将SPI数据写入到专用的环形缓冲区中
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_SPI], spi_data, spi_data_len);
-            //释放互斥锁，允许其他等待的线程访问共享资源
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_SPI].cs);
-            
-            // debug_printf("分发SPI数据: %d字节, cmd_id=%d, device_index=%d", spi_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_STATUS) {
-            // 处理状态响应数据
-            unsigned char* status_data = raw_data + pos;  // 包含完整的协议头
-            int status_data_len = packet_size;
-            
+            unsigned char* status_data = packet_base;
+            int status_data_len = (int)packet_size;
+
             debug_printf("收到状态响应: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, status_data_len);
-            
+
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_STATUS].cs);
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_STATUS], status_data, status_data_len);
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_STATUS].cs);
-            
-            // debug_printf("分发状态数据: %d字节, cmd_id=%d, device_index=%d", status_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_PWM) {
-            // 处理PWM响应数据
-            unsigned char* pwm_data = raw_data + pos;  // 包含完整的协议头
-            int pwm_data_len = packet_size;
-            
+            unsigned char* pwm_data = packet_base;
+            int pwm_data_len = (int)packet_size;
+
             debug_printf("收到PWM响应: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, pwm_data_len);
-            
+
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_PWM].cs);
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_PWM], pwm_data, pwm_data_len);
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_PWM].cs);
-            
-            // debug_printf("分发PWM数据: %d字节, cmd_id=%d, device_index=%d", pwm_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_UART) {
-            // 处理UART响应数据
-            unsigned char* uart_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
+            unsigned char* uart_data = packet_base + sizeof(GENERIC_CMD_HEADER);
             int uart_data_len = header->data_len;
-            
+
             debug_printf("收到UART数据: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, uart_data_len);
-            
+
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_UART], uart_data, uart_data_len);
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_UART].cs);
-            
+
             debug_printf("分发UART数据: %d字节, cmd_id=%d, device_index=%d", uart_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_GPIO) {
             if (header->cmd_id == GPIO_DIR_READ && header->data_len >= 1) {
-                unsigned char level = *(raw_data + pos + sizeof(GENERIC_CMD_HEADER));
+                unsigned char level = *(packet_base + sizeof(GENERIC_CMD_HEADER));
                 unsigned int idx = header->device_index;
                 if (idx < 256) {
                     device->gpio_level[idx] = level;
@@ -132,41 +172,42 @@ void parse_and_dispatch_protocol_data(device_handle_t* device, unsigned char* ra
                 }
             }
         } else if (header->protocol_type == PROTOCOL_GET_FIRMWARE_INFO) {
-            // 处理固件信息响应数据
-            unsigned char* firmware_data = raw_data + pos;  // 包含完整的协议头和数据
-            int firmware_data_len = packet_size;
-            
+            unsigned char* firmware_data = packet_base;
+            int firmware_data_len = (int)packet_size;
+
             debug_printf("收到固件信息响应: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, firmware_data_len);
-            
-            // 将固件信息数据写入原始缓冲区，供应用层读取
+
             EnterCriticalSection(&device->raw_buffer.cs);
             write_to_ring_buffer(&device->raw_buffer, firmware_data, firmware_data_len);
             LeaveCriticalSection(&device->raw_buffer.cs);
-            
+
             debug_printf("分发固件信息数据: %d字节, cmd_id=%d, device_index=%d", firmware_data_len, header->cmd_id, header->device_index);
         } else if (header->protocol_type == PROTOCOL_CURRENT) {
-            // 处理电流数据
-            unsigned char* current_data = raw_data + pos + sizeof(GENERIC_CMD_HEADER);
+            unsigned char* current_data = packet_base + sizeof(GENERIC_CMD_HEADER);
             int current_data_len = header->data_len;
-            
+
             debug_printf("收到电流数据: protocol_type=%d, cmd_id=%d, device_index=%d, data_len=%d", 
                         header->protocol_type, header->cmd_id, header->device_index, current_data_len);
-            
-            // 将电流数据写入POWER缓冲区（复用POWER协议缓冲区）
+
             EnterCriticalSection(&device->protocol_buffers[PROTOCOL_POWER].cs);
             int before_size = device->protocol_buffers[PROTOCOL_POWER].data_size;
             write_to_ring_buffer(&device->protocol_buffers[PROTOCOL_POWER], current_data, current_data_len);
             int after_size = device->protocol_buffers[PROTOCOL_POWER].data_size;
             LeaveCriticalSection(&device->protocol_buffers[PROTOCOL_POWER].cs);
-            
+
             debug_printf("分发电流数据: %d字节, cmd_id=%d, device_index=%d, 缓冲区: %d->%d", 
                         current_data_len, header->cmd_id, header->device_index, before_size, after_size);
         } else {
             debug_printf("收到非SPI协议数据: protocol_type=%d, cmd_id=%d", header->protocol_type, header->cmd_id);
         }
-        
-        pos += packet_size;
+
+        if (device->rx_cache_size == packet_size) {
+            device->rx_cache_size = 0;
+            break;
+        }
+        memmove(device->rx_cache, device->rx_cache + packet_size, device->rx_cache_size - packet_size);
+        device->rx_cache_size -= packet_size;
     }
 }
 
@@ -443,12 +484,23 @@ int usb_middleware_open_device(const char* serial) {
     raw_rb->read_pos = 0;
     raw_rb->data_size = 0;
     InitializeCriticalSection(&raw_rb->cs);
+
+    g_devices[slot].rx_cache = NULL;
+    g_devices[slot].rx_cache_size = 0;
+    g_devices[slot].rx_cache_capacity = 0;
+    (void)ensure_rx_cache_capacity(&g_devices[slot], RX_CACHE_INITIAL_CAPACITY);
     
     g_devices[slot].stop_thread = FALSE;
     g_devices[slot].thread_running = TRUE;
     
     g_devices[slot].read_thread = CreateThread(NULL, 0, usb_device_read_thread_func, &g_devices[slot], 0, NULL);
     if (!g_devices[slot].read_thread) {
+        if (g_devices[slot].rx_cache) {
+            free(g_devices[slot].rx_cache);
+            g_devices[slot].rx_cache = NULL;
+        }
+        g_devices[slot].rx_cache_size = 0;
+        g_devices[slot].rx_cache_capacity = 0;
         DeleteCriticalSection(&spi_rb->cs);
         DeleteCriticalSection(&raw_rb->cs);
         free(spi_rb->buffer);
@@ -560,6 +612,13 @@ int usb_middleware_close_device(int device_id) {
     }
     LeaveCriticalSection(&raw_rb->cs);
     DeleteCriticalSection(&raw_rb->cs);
+
+    if (g_devices[slot].rx_cache) {
+        free(g_devices[slot].rx_cache);
+        g_devices[slot].rx_cache = NULL;
+    }
+    g_devices[slot].rx_cache_size = 0;
+    g_devices[slot].rx_cache_capacity = 0;
     
     debug_printf("关闭设备句柄: 设备ID %d", device_id);
     usb_device_close(g_devices[slot].libusb_handle);
